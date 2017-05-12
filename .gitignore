@@ -1,0 +1,14 @@
+*.rar
+
+/*/output
+
+/*/listing
+
+/*/*.uvgui.*
+
+/*/*.uvopt
+
+/*/*.bak
+
+/*/*.dep
+/*/debug
