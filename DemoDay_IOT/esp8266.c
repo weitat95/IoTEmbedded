@@ -34,8 +34,8 @@
  \------------------------------/
 ESP8266    TM4C123
   1 URxD    PB1   UART out of TM4C123, 115200 baud
-  2 GPIO0         +3.3V for normal operation (ground to flash)
-  3 GPIO2         +3.3V
+  2 GPIO0         X Don't connect
+  3 GPIO2         X Don't connect
   4 GND     Gnd   GND (70mA)
   5 UTxD    PB0   UART out of ESP8266, 115200 baud
   6 Ch_PD         chip select, 10k resistor to 3.3V
@@ -59,8 +59,8 @@ ESP8266    TM4C123
 #include "LEDring.h"
 
 // Access point parameters
-#define SSID_NAME  "AndroidHotspot5195"
-#define PASSKEY    "cocococo"
+#define SSID_NAME  "leeleelee"
+#define PASSKEY    "0340501087"
 
 //#define SEC_TYPE   ESP8266_ENCRYPT_MODE_WPA2_PSK
 
@@ -360,18 +360,18 @@ void ESP8266_Init(uint32_t baud){
   printf("ESP8266 Initialization:\n\r");
   ESP8266_EchoResponse = true; // debugging
   AllColor(50, 50, 0, 1);
-  if(ESP8266_Reset()==0){
-    printf("Reset failure, could not reset\n\r"); while(1){};
-  }
+ // if(ESP8266_Reset()==0){
+  //  printf("Reset failure, could not reset\n\r"); while(1){};
+ // }
 //  ESP8266SendCommand("AT+UART_CUR=115200,8,1,0,0\r\n");
 //  UART_InChar();
 
 //  ESP8266_InitUART(115200,true);
 
-// step 2: AT+CWMODE=1 set wifi mode to client (not an access point)
-//  if(ESP8266_SetWifiMode(ESP8266_WIFI_MODE_CLIENT)==0){
-//  printf("SetWifiMode, could not set mode\n\r"); while(1){};
-// }
+ //step 2: AT+CWMODE=1 set wifi mode to client (not an access point)
+  if(ESP8266_SetWifiMode(ESP8266_WIFI_MODE_CLIENT)==0){
+  printf("SetWifiMode, could not set mode\n\r"); while(1){};
+ }
 // step 3: AT+CWJAP="ValvanoAP","12345678"  connect to access point
   AllColor(0, 50, 50, 1);
   if(ESP8266_JoinAccessPoint(SSID_NAME,PASSKEY)==0){
