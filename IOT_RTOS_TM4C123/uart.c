@@ -1,55 +1,37 @@
-/*
-*  uart.c
-*
-*  Runs on LM4F120/TM4C123
-*  Use UART0 to implement bidirectional data transfer to and from a
-*  computer running HyperTerminal.  This time, interrupts and FIFOs
-*  are used..
-*  ----------------------------------------------------------------------------
-*  SOFTWARE DISCLAIMER
-*
-*  THIS SOFTWARE IS PROVIDED "AS IS".  NO WARRANTIES, WHETHER EXPRESS, IMPLIED
-*  OR STATUTORY, INCLUDING, BUT NOT LIMITED TO, IMPLIED WARRANTIES OF
-*  MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE APPLY TO THIS SOFTWARE.
-*  THE AUTHOR(S) SHALL NOT, IN ANY CIRCUMSTANCES, BE LIABLE FOR SPECIAL,
-*  INCIDENTAL, OR CONSEQUENTIAL DAMAGES, FOR ANY REASON WHATSOEVER.
-*  ----------------------------------------------------------------------------
-*  SOFTWARE UPDATES:
-*
-*      NAME            DATE/TIME              COMMENTS
-*  Jonathan Valvano    January  11, 2017      Initial/Base version (CopyRight)
-*  PEGASUS TEAM        April, 10 2017         Initial Version
-*
-*  NOTES:
-*  - Professor Spring 2017 class: Prof. Jonathan W. Valvano
-*  - TA Spring 2017             : Kishore Punniyamurthy
-*
-*/
+// UART.c
+// Runs on LM4F120/TM4C123
+// Use UART0 to implement bidirectional data transfer to and from a
+// computer running HyperTerminal.  This time, interrupts and FIFOs
+// are used.
+// Daniel Valvano
+// September 19, 2015
+// Modified by EE345L students Charlie Gough && Matt Hawk
+// Modified by EE345M students Agustinus Darmawan && Mingjie Qiu
 
-/*
-  This example accompanies the book
-  "Embedded Systems: Real Time Interfacing to Arm Cortex M Microcontrollers",
-  ISBN: 978-1463590154, Jonathan Valvano, copyright (c) 2015
-  Program 5.11 Section 5.6, Program 3.10
+/* This example accompanies the book
+   "Embedded Systems: Real Time Interfacing to Arm Cortex M Microcontrollers",
+   ISBN: 978-1463590154, Jonathan Valvano, copyright (c) 2015
+   Program 5.11 Section 5.6, Program 3.10
 
-  Copyright 2015 by Jonathan W. Valvano, valvano@mail.utexas.edu
+ Copyright 2015 by Jonathan W. Valvano, valvano@mail.utexas.edu
     You may use, edit, run or distribute this file
     as long as the above copyright notice remains
-  THIS SOFTWARE IS PROVIDED "AS IS".  NO WARRANTIES, WHETHER EXPRESS, IMPLIED
-  OR STATUTORY, INCLUDING, BUT NOT LIMITED TO, IMPLIED WARRANTIES OF
-  MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE APPLY TO THIS SOFTWARE.
-  VALVANO SHALL NOT, IN ANY CIRCUMSTANCES, BE LIABLE FOR SPECIAL, INCIDENTAL,
-  OR CONSEQUENTIAL DAMAGES, FOR ANY REASON WHATSOEVER.
-  For more information about my classes, my research, and my books, see
-  http://users.ece.utexas.edu/~valvano/
-*/
+ THIS SOFTWARE IS PROVIDED "AS IS".  NO WARRANTIES, WHETHER EXPRESS, IMPLIED
+ OR STATUTORY, INCLUDING, BUT NOT LIMITED TO, IMPLIED WARRANTIES OF
+ MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE APPLY TO THIS SOFTWARE.
+ VALVANO SHALL NOT, IN ANY CIRCUMSTANCES, BE LIABLE FOR SPECIAL, INCIDENTAL,
+ OR CONSEQUENTIAL DAMAGES, FOR ANY REASON WHATSOEVER.
+ For more information about my classes, my research, and my books, see
+ http://users.ece.utexas.edu/~valvano/
+ */
 
 // U0Rx (VCP receive) connected to PA0
 // U0Tx (VCP transmit) connected to PA1
 #include <stdint.h>
-#include "uart.h"
-#include "uart_fifo.h"
-#include "inc/tm4c123gh6pm.h"
+#include "../inc/tm4c123gh6pm.h"
+#include <stdio.h>
+#include "FIFO.h"
+#include "UART.h"
 
 #define NVIC_EN0_INT5           0x00000020  // Interrupt 5 enable
 
@@ -75,29 +57,30 @@
 #define UART_ICR_TXIC           0x00000020  // Transmit Interrupt Clear
 #define UART_ICR_RXIC           0x00000010  // Receive Interrupt Clear
 
+
+
 void DisableInterrupts(void); // Disable interrupts
 void EnableInterrupts(void);  // Enable interrupts
 long StartCritical (void);    // previous I bit, disable interrupts
 void EndCritical(long sr);    // restore I bit to previous value
 void WaitForInterrupt(void);  // low power mode
-#define FIFOSIZE   16         // size of the FIFOs (must be power of 2)
+#define FIFOSIZE   1024       // size of the FIFOs (must be power of 2)
 #define FIFOSUCCESS 1         // return value on success
 #define FIFOFAIL    0         // return value on failure
                               // create index implementation FIFO (see FIFO.h)
-//AddIndexFifo(Rx_UART, FIFOSIZE, char, FIFOSUCCESS, FIFOFAIL)
-//AddIndexFifo(Tx_UART, FIFOSIZE, char, FIFOSUCCESS, FIFOFAIL)
-	
+AddIndexFifo(Rx, FIFOSIZE, char, FIFOSUCCESS, FIFOFAIL)
+AddIndexFifo(Tx, 1024, char, FIFOSUCCESS, FIFOFAIL)
+
 // Initialize UART0
 // Baud rate is 115200 bits/sec
 void UART_Init(void){
   SYSCTL_RCGCUART_R |= 0x01;            // activate UART0
   SYSCTL_RCGCGPIO_R |= 0x01;            // activate port A
-  Rx_UARTFifo_Init();                        // initialize empty FIFOs
-  Tx_UARTFifo_Init();
-	
+  RxFifo_Init();                        // initialize empty FIFOs
+  TxFifo_Init();
   UART0_CTL_R &= ~UART_CTL_UARTEN;      // disable UART
-  UART0_IBRD_R = 43;                    // IBRD = int(80,000,000 / (16 * 115,200)) = int(43.4028)
-  UART0_FBRD_R = 26;                     // FBRD = int(0.4028 * 64 + 0.5) = 26
+  UART0_IBRD_R = 43;                    // IBRD = int(80,000,000 / (16 * 115,200)) = int(43.403)
+  UART0_FBRD_R = 26;                    // FBRD = round(0.4028 * 64 ) = 26
                                         // 8 bit word length (no parity bits, one stop bit, FIFOs)
   UART0_LCRH_R = (UART_LCRH_WLEN_8|UART_LCRH_FEN);
   UART0_IFLS_R &= ~0x3F;                // clear TX and RX interrupt FIFO level fields
@@ -106,31 +89,31 @@ void UART_Init(void){
   UART0_IFLS_R += (UART_IFLS_TX1_8|UART_IFLS_RX1_8);
                                         // enable TX and RX FIFO interrupts and RX time-out interrupt
   UART0_IM_R |= (UART_IM_RXIM|UART_IM_TXIM|UART_IM_RTIM);
-  UART0_CTL_R |= UART_CTL_UARTEN;       // enable UART
+  UART0_CTL_R |= 0x301;                 // enable UART
   GPIO_PORTA_AFSEL_R |= 0x03;           // enable alt funct on PA1-0
   GPIO_PORTA_DEN_R |= 0x03;             // enable digital I/O on PA1-0
                                         // configure PA1-0 as UART
   GPIO_PORTA_PCTL_R = (GPIO_PORTA_PCTL_R&0xFFFFFF00)+0x00000011;
   GPIO_PORTA_AMSEL_R = 0;               // disable analog functionality on PA
                                         // UART0=priority 2
-  NVIC_PRI1_R = (NVIC_PRI1_R&0xFFFF00FF)|0x00008000; // bits 13-15
+  NVIC_PRI1_R = (NVIC_PRI1_R&0xFFFF00FF)|0x00004000; // bits 13-15
   NVIC_EN0_R = NVIC_EN0_INT5;           // enable interrupt 5 in NVIC
 }
 // copy from hardware RX FIFO to software RX FIFO
 // stop when hardware RX FIFO is empty or software RX FIFO is full
 void static copyHardwareToSoftware(void){
   char letter;
-  while(((UART0_FR_R&UART_FR_RXFE) == 0) && (Rx_UARTFifo_Size() < (FIFOSIZE - 1))){
+  while(((UART0_FR_R&UART_FR_RXFE) == 0) && (RxFifo_Size() < (FIFOSIZE - 1))){
     letter = UART0_DR_R;
-    Rx_UARTFifo_Put(letter);
+    RxFifo_Put(letter);
   }
 }
 // copy from software TX FIFO to hardware TX FIFO
 // stop when software TX FIFO is empty or hardware TX FIFO is full
 void static copySoftwareToHardware(void){
   char letter;
-  while(((UART0_FR_R&UART_FR_TXFF) == 0) && (Tx_UARTFifo_Size() > 0)){
-    Tx_UARTFifo_Get(&letter);
+  while(((UART0_FR_R&UART_FR_TXFF) == 0) && (TxFifo_Size() > 0)){
+    TxFifo_Get(&letter);
     UART0_DR_R = letter;
   }
 }
@@ -138,13 +121,40 @@ void static copySoftwareToHardware(void){
 // spin if RxFifo is empty
 char UART_InChar(void){
   char letter;
-  while(Rx_UARTFifo_Get(&letter) == FIFOFAIL){};
+  while(RxFifo_Get(&letter) == FIFOFAIL){};
   return(letter);
 }
-// output ASCII character to UART
-// spin if TxFifo is full
+
+//------------UART_InCharNonBlock------------
+// input ASCII character from UART
+// output: 0 if RxFifo is empty
+//         character if
+char UART_InCharNonBlock(void){
+  char letter;
+  if(RxFifo_Get(&letter) == FIFOFAIL){
+    return 0;  // empty
+  };
+  return(letter);
+}
+
+//------------UART_OutChar------------
+// Output 8-bit to serial port
+// Input: letter is an 8-bit ASCII character to be transferred
+// Output: none
+// spin if TxFifo full
 void UART_OutChar(char data){
-  while(Tx_UARTFifo_Put(data) == FIFOFAIL){};
+  while(TxFifo_Put(data) == FIFOFAIL){};
+  UART0_IM_R &= ~UART_IM_TXIM;          // disable TX FIFO interrupt
+  copySoftwareToHardware();
+  UART0_IM_R |= UART_IM_TXIM;           // enable TX FIFO interrupt
+}
+//------------UART_OutCharNonBlock------------
+// non blocking output ASCII character to UART
+// Input: letter is an 8-bit ASCII character to be transferred
+// Output: none
+// Error: return with lost data if TxFifo is full
+void UART_OutCharNonBlock(char data){
+  if(TxFifo_Put(data) == FIFOFAIL) return; // lost data
   UART0_IM_R &= ~UART_IM_TXIM;          // disable TX FIFO interrupt
   copySoftwareToHardware();
   UART0_IM_R |= UART_IM_TXIM;           // enable TX FIFO interrupt
@@ -158,7 +168,7 @@ void UART0_Handler(void){
     UART0_ICR_R = UART_ICR_TXIC;        // acknowledge TX FIFO
     // copy from software TX FIFO to hardware TX FIFO
     copySoftwareToHardware();
-    if(Tx_UARTFifo_Size() == 0){             // software TX FIFO is empty
+    if(TxFifo_Size() == 0){             // software TX FIFO is empty
       UART0_IM_R &= ~UART_IM_TXIM;      // disable TX FIFO interrupt
     }
   }
@@ -308,17 +318,13 @@ void UART_OutUHex(uint32_t number){
 // Input: pointer to empty buffer, size of buffer
 // Output: Null terminated string
 // -- Modified by Agustinus Darmawan + Mingjie Qiu --
-void UART_InString(char *bufPt, uint16_t max) 
-{
-  int length=0;
-  char character;
+void UART_InString(char *bufPt, uint16_t max) {
+int length=0;
+char character;
   character = UART_InChar();
-  while(character != CR)
-  {
-    if(character == BS)
-    {
-      if(length)
-      {
+  while(character != CR){
+    if(character == BS){
+      if(length){
         bufPt--;
         length--;
         UART_OutChar(BS);
@@ -335,11 +341,71 @@ void UART_InString(char *bufPt, uint16_t max)
   *bufPt = 0;
 }
 
-//---------------------UART_CRLF---------------------
-// Output a CR,LF to UART to go to a new line
+
+// this is used for printf to output to the usb uart
+int fputc(int ch, FILE *f){
+  UART_OutChar(ch);
+  return 1;
+}
+
+#ifdef __TI_COMPILER_VERSION__
+  //Code Composer Studio Code
+#include "file.h"
+int uart_open(const char *path, unsigned flags, int llv_fd){
+  UART_Init();
+  return 0;
+}
+int uart_close( int dev_fd){
+  return 0;
+}
+int uart_read(int dev_fd, char *buf, unsigned count){char ch;
+  ch = UART_InChar();    // receive from keyboard
+  ch = *buf;         // return by reference
+  UART_OutChar(ch);  // echo
+  return 1;
+}
+int uart_write(int dev_fd, const char *buf, unsigned count){ unsigned int num=count;
+  while(num){
+    UART_OutChar(*buf);
+    buf++;
+    num--;
+  }
+  return count;
+}
+off_t uart_lseek(int dev_fd, off_t ioffset, int origin){
+  return 0;
+}
+int uart_unlink(const char * path){
+  return 0;
+}
+int uart_rename(const char *old_name, const char *new_name){
+  return 0;
+}
+
+//------------Output_Init------------
+// Initialize the UART for 115,200 baud rate (assuming 80 MHz bus clock),
+// 8 bit word length, no parity bits, one stop bit
 // Input: none
 // Output: none
-void UART_CRLF(void){
-  UART_OutChar(CR);
-  UART_OutChar(LF);
+void Output_Init(void){int ret_val; FILE *fptr;
+  UART_Init();
+  ret_val = add_device("uart", _SSA, uart_open, uart_close, uart_read, uart_write, uart_lseek, uart_unlink, uart_rename);
+  if(ret_val) return; // error
+  fptr = fopen("uart","w");
+  if(fptr == 0) return; // error
+  freopen("uart:", "w", stdout); // redirect stdout to uart
+  setvbuf(stdout, NULL, _IONBF, 0); // turn off buffering for stdout
+
 }
+#else
+//Keil uVision Code
+//------------Output_Init------------
+// Initialize the UART for 115,200 baud rate (assuming 80 MHz bus clock),
+// 8 bit word length, no parity bits, one stop bit, FIFOs enabled
+// Input: none
+// Output: none
+void Output_Init(void){
+  UART_Init();
+}
+#endif
+

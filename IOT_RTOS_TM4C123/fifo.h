@@ -9,11 +9,11 @@
 // June 16, 2011
 
 /* This example accompanies the book
-   "Embedded Systems: Real Time Interfacing to the Arm Cortex M3",
-   ISBN: 978-1463590154, Jonathan Valvano, copyright (c) 2014
+   "Embedded Systems: Real Time Interfacing to Arm Cortex M Microcontrollers",
+   ISBN: 978-1463590154, Jonathan Valvano, copyright (c) 2015
       Programs 3.7, 3.8., 3.9 and 3.10 in Section 3.7
 
- Copyright 2014 by Jonathan W. Valvano, valvano@mail.utexas.edu
+ Copyright 2015 by Jonathan W. Valvano, valvano@mail.utexas.edu
     You may use, edit, run or distribute this file
     as long as the above copyright notice remains
  THIS SOFTWARE IS PROVIDED "AS IS".  NO WARRANTIES, WHETHER EXPRESS, IMPLIED

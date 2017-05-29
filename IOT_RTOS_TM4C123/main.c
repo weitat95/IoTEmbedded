@@ -39,6 +39,7 @@
 #include "gpio.h"
 #include "inc/tm4c123gh6pm.h"
 
+#include "esp8266.h"
 
 #define TIME_SLICE (2*TIME_1MS)
 #define ST7735             
@@ -52,12 +53,6 @@
 #define PF3       (*((volatile uint32_t *)0x40025020))
 #define PF4       (*((volatile uint32_t *)0x40025040))
 
-uint32_t NumCreated;   // number of foreground threads created
-uint32_t NumSamples;   // incremented every sample
-uint32_t DataLost;     // data sent by Producer, but not received by Consumer
-uint32_t Idlecount;
-uint8_t  Running;                // true while robot is running
-uint32_t count1;
 #define WHITE PF1=0x02; PF2=0x04; PF3=0x08;
 #define RED PF1=0x02; PF2=0; PF3=0;
 #define GREEN PF1=0; PF2=0x00; PF3=0x08;
@@ -66,6 +61,14 @@ uint32_t count1;
 #define PURPLE  PF1=0x02; PF2=0x04; PF3=0;
 #define CYAN PF1=0; PF2=0x04; PF3=0x08;
 
+uint32_t NumCreated;   // number of foreground threads created
+uint32_t NumSamples;   // incremented every sample
+uint32_t DataLost;     // data sent by Producer, but not received by Consumer
+uint32_t Idlecount;
+uint8_t  Running;                // true while robot is running
+
+uint32_t count1;
+uint32_t wifiStatus;
 //******** IdleTask  ***************
 // foreground thread, runs when no other work needed
 // never blocks, never sleeps, never dies
@@ -80,16 +83,31 @@ void IdleTask(void){
     //WaitForInterrupt();
   }
 }
-void thread1(void){
-  
+
+void WifiTask(void){
+  wifiStatus=1;
+  if(ESP8266_Init(115200)){
+    ESP8266_GetVersionNumber();
+    ESP8266_GetStatus();
+  }else{
+    printf("wifi not connected");
+    wifiStatus=0;
+    OS_Kill();
+  }
   while(TRUE){
     
+    if(!logOwnServer(111,222,333)){
+        wifiStatus=0;
+        OS_Kill();
+    }
     count1++;
+    DelayMs(5000);
   }
 }  
 int main(void){
   
   OS_Init();        // OS Initialization
+  Output_Init();
   GPIO_PortF_Init();
   Running    = 0;        // Log not running
   DataLost   = 0;        // lost data between producer and consumer
@@ -99,7 +117,7 @@ int main(void){
   NumCreated = 0;
   // create initial foreground threads
   NumCreated += OS_AddThread(&IdleTask,128,5);  // runs when nothing useful to do
-  NumCreated += OS_AddThread(&thread1,128,5);
+  NumCreated += OS_AddThread(&WifiTask,128,5);
   OS_Launch(TIME_SLICE); // doesn't return, interrupts enabled in here
 
   return -1;             // this never executes
