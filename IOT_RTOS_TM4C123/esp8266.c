@@ -65,7 +65,7 @@ ESP8266    TM4C123
 //#define SEC_TYPE   ESP8266_ENCRYPT_MODE_WPA2_PSK
 
 #define BUFFER_SIZE 1024
-#define MAXTRY 3
+#define MAXTRY 2
 // prototypes for functions defined in startup.s
 void DisableInterrupts(void); // Disable interrupts
 void EnableInterrupts(void);  // Enable interrupts
@@ -348,17 +348,18 @@ void DelayMsSearching(uint32_t n){
 // initializes the module as a client
 // Inputs: baud rate: tested with 9600 and 115200
 // Outputs: none
-int32_t ESP8266_Init(uint32_t baud){
+void ESP8266_Init(uint32_t baud){
   ESP8266_InitUART(baud,true); // baud rate, no echo to UART0
   ESP8266_EnableRXInterrupt();
   SearchLooking = false;
   SearchFound = false;
   ServerResponseSearchLooking = 0; // not looking for "+IPD"
   ServerResponseSearchFinished = 0;
-  EnableInterrupts();
-// step 1: AT+RST reset module
-  printf("ESP8266 Initialization:\n\r");
   ESP8266_EchoResponse = true; // debugging
+}
+
+int32_t ESP8266_ConnectWifi(void){
+// step 1: AT+RST reset module
   //AllColor(50, 50, 0, 1);
  // if(ESP8266_Reset()==0){
   //  printf("Reset failure, could not reset\n\r"); while(1){};
@@ -856,7 +857,6 @@ uint32_t logOwnServer(uint32_t data1,uint32_t data2, uint32_t data3){
     //ESP8266_SendTCP("GET /query?city=Austin%20Texas&id=Jonathan%20Valvano&data1=Int%20Temp%3D21C&data2=Int%20Temp%3D55C&edxcode=8086 HTTP/1.1\r\nUser-Agent: Keil\r\nHost: emb445l.appspot.com\r\n\r\n");
     ESP8266_SendTCP(fullData);
   }else{
-    ESP8266_CloseTCPConnection();
     return 0;
   }
   ESP8266_CloseTCPConnection();

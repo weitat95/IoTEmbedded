@@ -758,7 +758,7 @@ void OS_DisSW2Task(void){
   GPIO_PORTF_IM_R &= ~0x01;      // Disarm Interrupt PF0
 }
 
-/*void GPIOPortF_Handler(void){
+void GPIOPortF_Handler(void){
   #ifdef DEBUG
   PF3^=0x08;
   PF3^=0x08;
@@ -774,7 +774,7 @@ void OS_DisSW2Task(void){
   #ifdef DEBUG
   PF3^=0x08;
   #endif
-}*/
+}
 #define FIFOSIZE 2048
 #define FIFOFAIL 0
 #define FIFOSUCCESS 1

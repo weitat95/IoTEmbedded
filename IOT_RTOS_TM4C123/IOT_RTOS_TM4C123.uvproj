@@ -436,11 +436,6 @@
               <FilePath>.\adct0atrigger.c</FilePath>
             </File>
             <File>
-              <FileName>fifo.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>.\fifo.c</FilePath>
-            </File>
-            <File>
               <FileName>uart_fifo.c</FileName>
               <FileType>1</FileType>
               <FilePath>.\uart_fifo.c</FilePath>
@@ -454,6 +449,16 @@
               <FileName>gpio.c</FileName>
               <FileType>1</FileType>
               <FilePath>.\gpio.c</FilePath>
+            </File>
+            <File>
+              <FileName>esp8266.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\esp8266.c</FilePath>
+            </File>
+            <File>
+              <FileName>hc05.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\hc05.c</FilePath>
             </File>
           </Files>
         </Group>
