@@ -31,7 +31,7 @@
 // Outputs: none
 void ESP8266_Init(uint32_t baud);
 
-int32_t ESP8266_ConnectWifi(void);
+int32_t ESP8266_ConnectWifi(char* ssid,char* pw);
 //------------------- ESP8266_InitUART-------------------
 // intializes uart and gpio needed to communicate with esp8266
 // Configure UART1 for serial full duplex operation

@@ -358,7 +358,7 @@ void ESP8266_Init(uint32_t baud){
   ESP8266_EchoResponse = true; // debugging
 }
 
-int32_t ESP8266_ConnectWifi(void){
+int32_t ESP8266_ConnectWifi(char * SSID,char* PW){
 // step 1: AT+RST reset module
   //AllColor(50, 50, 0, 1);
  // if(ESP8266_Reset()==0){
@@ -375,7 +375,7 @@ int32_t ESP8266_ConnectWifi(void){
  }
 // step 3: AT+CWJAP="ValvanoAP","12345678"  connect to access point
   //AllColor(0, 50, 50, 1);
-  if(ESP8266_JoinAccessPoint(SSID_NAME,PASSKEY)==0){
+  if(ESP8266_JoinAccessPoint(SSID,PW)==0){
     printf("JoinAccessPoint error, could not join AP\n\r"); return 0;
   }
 // optional step: AT+CIFSR check to see our IP address

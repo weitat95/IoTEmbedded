@@ -35,7 +35,7 @@
  \---------------------------/ 
 HC05        TM4C123 
   1 EN                  Enable pin
-  2 VCC     +3.3V       +3.3V 
+  2 VCC     +5V       +3.6V-6V 
   3 GND     GND         Ground
   4 UTxD    PC6(U3Rx)   UART Out of HC05,  38,400 baud
   5 URxD    PC7(U3Tx)   UART In of HC05,  38,400 baud

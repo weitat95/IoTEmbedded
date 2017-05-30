@@ -19,7 +19,7 @@
  \---------------------------/ 
 HC05        TM4C123 
   1 EN                  Enable pin
-  2 VCC     +3.3V       +3.3V 
+  2 VCC     +5V       +3.6V-6V 
   3 GND     GND         Ground
   4 UTxD    PC6(U3Rx)   UART Out of HC05,  38,400 baud
   5 URxD    PC7(U3Tx)   UART In of HC05,  38,400 baud
@@ -166,6 +166,25 @@ char HC05_InChar(void){
   char letter;
   while(RxHCFifo_Get(&letter) == FIFOFAIL){};
   return(letter);
+}
+uint32_t index;
+void HC05_InString(char *string,uint32_t size){
+  index=0;
+  char letter;
+  while(1){
+    letter = HC05_InChar();
+    if( letter ==0x0D && index==0){continue;}
+    if(letter == 0x7F ){ //backspace (0x7F)
+      string[--index]=0;
+    }else if(letter == 0x0D ){ // \r (0x0D) or enter key
+      return;
+    }else{
+      string[index++]=letter;
+    }
+    if(index>=size){
+      return;
+    }
+  }
 }
 
 
