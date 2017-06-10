@@ -285,6 +285,7 @@ void ESP8266FIFOtoBuffer(void){
     letter = UART1_DR_R;        // retrieve char from FIFO
     if(ESP8266_EchoResponse){
       UART_OutCharNonBlock(letter); // echo
+      //printf("%c",letter);
     }
     if(RXBufferIndex >= BUFFER_SIZE){
       RXBufferIndex = 0; // store last BUFFER_SIZE received
@@ -545,6 +546,7 @@ int ESP8266_MakeTCPConnection(char *IPaddress){
   SearchStart("ok");
   while(try){
     sprintf((char*)TXBuffer, "AT+CIPSTART=\"TCP\",\"%s\",80\r\n", IPaddress);
+    
     ESP8266SendCommand(TXBuffer);   // open and connect to a socket
     DelayMsSearching(8000);
     if(SearchFound) return 1; // success

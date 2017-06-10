@@ -138,9 +138,11 @@ void HC05FIFOtoBuffer(void){
   while((UART3_FR_R&UART_FR_RXFE) == 0){
     letter = UART3_DR_R;        // retrieve char from FIFO
     //if(ESP8266_EchoResponse){
-      UART_OutCharNonBlock(letter); // echo
+      //UART_OutCharNonBlock(letter); // echo
+      HC05_PrintChar(letter);
       if(letter=='\r'){
-        UART_OutCharNonBlock('\n');
+        //UART_OutCharNonBlock('\n');
+        HC05_PrintChar('\n');
       }
    // }
       
@@ -186,7 +188,10 @@ void HC05_InString(char *string,uint32_t size){
     }
   }
 }
-
+int fputc(int ch, FILE *f){
+  HC05_PrintChar(ch);
+  return 1;
+}
 
 //---------HC05SendCommand-----
 // - sends a string to the HC05 module

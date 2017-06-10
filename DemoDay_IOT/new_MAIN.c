@@ -124,7 +124,7 @@ int main(void){
   ADC0_InitSWTriggerSeq3_Ch9();
   EnableInterrupts();
   StartBarometer();
-  connect_esp_fetch_data_test();
+ // connect_esp_fetch_data_test();
   Timer0A_Init();
 
   while(1){
@@ -142,7 +142,7 @@ int main(void){
   else if (BLUETOOTH_ON==1) { LED_R=0; LED_G=255; LED_B=255; } // Only BT
   else { LED_R=20; LED_G=20; LED_B=20; } // NO CONNECTION (but power)
   */
-
+/*
   // Capacitive Wifi
   if((touch_wifi==1)&&(periodic_wifi==0)){
     if (uploading==0) {Loading(GLACIER_BLUE, brightness, 7);}
@@ -162,7 +162,7 @@ int main(void){
     periodic_wifi=0;
     Timer0A_Init();
   }
-
+*/
   if (gas>=GAS_THRESHOLD) {
     AllColor(RED, brightness);
   }
@@ -180,7 +180,8 @@ int main(void){
   }
 
   SysTick_Wait10ms(50);
-
+  AllColor(SKY_BLUE,brightness);
+  SysTick_Wait10ms(50);
   } // end while
 
 } // end main

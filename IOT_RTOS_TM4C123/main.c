@@ -110,8 +110,10 @@ void WifiTask(void){
     printf("\n\rwifi logging to server...\n\r");
     if(wifiStatus==0 || !logOwnServer(111,222,333)){
         wifiStatus=0;
+        printf("\n\rWifi Logging Failed\n\r");
         OS_Kill();
     }
+    printf("\n\rData Logged to server\n\r");
     espSendcount++;
     OS_Sleep(5000);
   }
@@ -142,7 +144,7 @@ void BluetoothTask(void){
       token=strtok(NULL,",");
       strcpy(pw,token);
       printf("PW=%s\n\r",token);
-      
+      wifiStatus=0;
     }else if(strcmp(token,"AT+CONNECT")==0){
       SW1_Task();
     }
@@ -183,6 +185,6 @@ int main(void){
  // NumCreated += OS_AddThread(&WifiTask,128,5);
   NumCreated += OS_AddThread(&BluetoothTask,128,5);
   OS_Launch(TIME_SLICE); // doesn't return, interrupts enabled in here
-
+  
   return -1;             // this never executes
 }

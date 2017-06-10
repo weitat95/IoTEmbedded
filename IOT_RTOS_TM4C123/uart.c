@@ -343,10 +343,10 @@ char character;
 
 
 // this is used for printf to output to the usb uart
-int fputc(int ch, FILE *f){
+/*int fputc(int ch, FILE *f){
   UART_OutChar(ch);
   return 1;
-}
+}*/
 
 #ifdef __TI_COMPILER_VERSION__
   //Code Composer Studio Code
