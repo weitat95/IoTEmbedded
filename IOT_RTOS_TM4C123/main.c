@@ -41,7 +41,8 @@
 
 #include "esp8266.h"
 #include "hc05.h"
-
+#include "WS2812.h"
+#include "barometer.h"
 #define DEFAULT_SSID "leeleelee"
 #define DEFAULT_PW "0340501087"
 
@@ -75,6 +76,7 @@ uint32_t espSendcount;
 uint32_t wifiStatus;
 char ssid[20];
 char pw[20];
+int32_t temperature;
 //******** IdleTask  ***************
 // foreground thread, runs when no other work needed
 // never blocks, never sleeps, never dies
@@ -147,6 +149,8 @@ void BluetoothTask(void){
       wifiStatus=0;
     }else if(strcmp(token,"AT+CONNECT")==0){
       SW1_Task();
+    }else if(strcmp(token,"AT+STOP")==0){
+      wifiStatus=0;
     }
   
     for(int i=0;i<STR_SIZE;i++){
@@ -160,14 +164,29 @@ void SW1_Task(void){
   NumCreated += OS_AddThread(&WifiTask,128,5);
 }
 
-  
-
+extern void LEDRingTask();
+int32_t buf1;
+int32_t buf2;
+int32_t oldTemp=0;
+void TempTask(void){
+  while(1){
+    oldTemp=buf1;
+    buf1=ReadTemperature();
+    if(oldTemp!=buf1){
+      printf("\n\r%ld\n\r",buf1);
+    }
+  }
+}
 int main(void){
   OS_Init();        // OS Initialization
   Output_Init();
   HC05_InitUART();
   HC05_EnableRXInterrupt();
   ESP8266_Init(115200);
+  WS2812_Init();
+  Baro_Init();
+  StartBarometer();
+
   GPIO_PortF_Init();
   Running    = 0;        // Log not running
   DataLost   = 0;        // lost data between producer and consumer
@@ -184,6 +203,8 @@ int main(void){
   NumCreated += OS_AddThread(&IdleTask,128,5);  // runs when nothing useful to do
  // NumCreated += OS_AddThread(&WifiTask,128,5);
   NumCreated += OS_AddThread(&BluetoothTask,128,5);
+  NumCreated += OS_AddThread(&LEDRingTask,128,5);
+  NumCreated += OS_AddThread(&TempTask,128,5);
   OS_Launch(TIME_SLICE); // doesn't return, interrupts enabled in here
   
   return -1;             // this never executes

@@ -460,6 +460,26 @@
               <FileType>1</FileType>
               <FilePath>.\hc05.c</FilePath>
             </File>
+            <File>
+              <FileName>WS2812.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\WS2812.c</FilePath>
+            </File>
+            <File>
+              <FileName>DMATimer.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\DMATimer.c</FilePath>
+            </File>
+            <File>
+              <FileName>LEDRINGTask.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\LEDRINGTask.c</FilePath>
+            </File>
+            <File>
+              <FileName>barometer.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\barometer.c</FilePath>
+            </File>
           </Files>
         </Group>
       </Groups>
