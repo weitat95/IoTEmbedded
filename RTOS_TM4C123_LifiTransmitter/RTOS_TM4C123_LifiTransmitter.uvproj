@@ -460,6 +460,11 @@
               <FileType>1</FileType>
               <FilePath>.\LifiEmitter.c</FilePath>
             </File>
+            <File>
+              <FileName>LifiReceiver.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\LifiReceiver.c</FilePath>
+            </File>
           </Files>
         </Group>
       </Groups>
