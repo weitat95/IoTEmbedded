@@ -38,14 +38,16 @@
 #include "pll.h"
 #include "gpio.h"
 #include "inc/tm4c123gh6pm.h"
+#include "LifiEmitter.h"
+/*
+To program the emitter for the LIFI please define emitter below
+to program the receiver for the LIFI please define receiver below
+*/
+#define EMITTER
+//#define RECEIVER
 
-#include "esp8266.h"
-#include "hc05.h"
-#include "WS2812.h"
-#include "barometer.h"
-#define DEFAULT_SSID "leeleelee"
-#define DEFAULT_PW "0340501087"
-
+#define SYMBOLRATE 1000 //1kHz
+#define OVERSAMPLING 4 //over sampling factor for each manchester symbol
 #define TIME_SLICE (2*TIME_1MS)
 #define ST7735             
 // PORT B - Memory Mapped GPIO
@@ -58,6 +60,12 @@
 #define PF3       (*((volatile uint32_t *)0x40025020))
 #define PF4       (*((volatile uint32_t *)0x40025040))
 
+uint32_t NumCreated;   // number of foreground threads created
+uint32_t NumSamples;   // incremented every sample
+uint32_t DataLost;     // data sent by Producer, but not received by Consumer
+uint32_t Idlecount;
+uint8_t  Running;                // true while robot is running
+uint32_t count1;
 #define WHITE PF1=0x02; PF2=0x04; PF3=0x08;
 #define RED PF1=0x02; PF2=0; PF3=0;
 #define GREEN PF1=0; PF2=0x00; PF3=0x08;
@@ -66,17 +74,9 @@
 #define PURPLE  PF1=0x02; PF2=0x04; PF3=0;
 #define CYAN PF1=0; PF2=0x04; PF3=0x08;
 
-uint32_t NumCreated;   // number of foreground threads created
-uint32_t NumSamples;   // incremented every sample
-uint32_t DataLost;     // data sent by Producer, but not received by Consumer
-uint32_t Idlecount;
-uint8_t  Running;                // true while robot is running
+#define SPACEFORMATTING UART_OutChar(CR); UART_OutChar(LF);
 
-uint32_t espSendcount;
-uint32_t wifiStatus;
-char ssid[20];
-char pw[20];
-int32_t temperature;
+
 //******** IdleTask  ***************
 // foreground thread, runs when no other work needed
 // never blocks, never sleeps, never dies
@@ -84,128 +84,133 @@ int32_t temperature;
 // outputs: none
 
 void IdleTask(void){
-  RED
+  
   while(TRUE){
-    if(wifiStatus==0){
-      GREEN
-    }else{
-      BLUE
-    }
+    //GREEN
     Idlecount++;        // debugging
     //WaitForInterrupt();
   }
 }
-
-void WifiTask(void){
-  if(wifiStatus==1){ return; }
-  wifiStatus=1;
-  printf("\n\rwifi task starting...ssid=%s pw=%s\n\r",ssid,pw);
-  if(ESP8266_ConnectWifi(ssid,pw)){
-    ESP8266_GetVersionNumber();
-    ESP8266_GetStatus();
-  }else{
-    printf("wifi not connected");
-    wifiStatus=0;
-    OS_Kill();
-  }
-  while(TRUE){
-    printf("\n\rwifi logging to server...\n\r");
-    if(wifiStatus==0 || !logOwnServer(111,222,333)){
-        wifiStatus=0;
-        printf("\n\rWifi Logging Failed\n\r");
-        OS_Kill();
-    }
-    printf("\n\rData Logged to server\n\r");
-    espSendcount++;
-    OS_Sleep(5000);
-  }
-}
-#define STR_SIZE 50
-char received[STR_SIZE];
-void SW1_Task(void);
-
-void BluetoothTask(void){
-  //uint8_t i=0;
-  char str[STR_SIZE];
-  const char s[2] = "=";
-  char *token;
-   
+void thread1(void){
+  
   while(TRUE){
     
-    HC05_InString(received,STR_SIZE);
-    strcpy(str,received);
-    /* get the first token */
-    token = strtok(str, s);
-   
-    /* walk through other tokens */
-    if(strcmp(token,"AT+JWP")==0){
-      printf("\n\rreceived AT+JWP\n\r");
-      token=strtok(NULL,",");
-      printf("SSID=%s ",token);
-      strcpy(ssid,token);
-      token=strtok(NULL,",");
-      strcpy(pw,token);
-      printf("PW=%s\n\r",token);
-      wifiStatus=0;
-    }else if(strcmp(token,"AT+CONNECT")==0){
-      SW1_Task();
-    }else if(strcmp(token,"AT+STOP")==0){
-      wifiStatus=0;
-    }
+    count1++;
+  }
+}
+#ifdef RECEIVER
+unsigned long buffer[100];
+int i=0;
+void producerTask(unsigned long data){
+  if(i<100){
+    buffer[i]=data;
+    i++;
+  }
+}
+void resetProducerTask(void){
+  i=0;
+}
+
+void producerTaskFifo(void){
   
-    for(int i=0;i<STR_SIZE;i++){
-      received[i]=0;
+}
+#endif
+
+#ifdef EMITTER
+
+int sendData(char* data){
+  return write(data,strlen(data));
+}
+char comBuffer[32];
+void sendPeriodicDataTask(void){
+  int n=0;
+  int counter=-99;
+  while(n<100){
+    while(sendData(comBuffer)!=0){
+      OS_Sleep(100);
+      counter++;
     }
+    printf("Data Sent:%u",n);
+    SPACEFORMATTING
+    n++;
   }
+  printf("Data Sending Task Done (sent:%u, Wait Counter:%u)",n,counter);
+  SPACEFORMATTING
+  OS_Kill();
 }
+#endif
+char string[32];
 
-void SW1_Task(void){
-  if(wifiStatus==1) return;
-  NumCreated += OS_AddThread(&WifiTask,128,5);
-}
-
-extern void LEDRingTask();
-int32_t buf1;
-int32_t buf2;
-int32_t oldTemp=0;
-void TempTask(void){
+void Interpreter(void) {
+  char str[32];
+  char *token;
+  UART_Init();
+#ifdef EMITTER  
+  initEmitter();
+#endif
+  UART_OutChar(CR);
+  UART_OutChar(LF);
   while(1){
-    oldTemp=buf1;
-    buf1=ReadTemperature();
-    if(oldTemp!=buf1){
-      //printf("\n\r%ld\n\r",buf1);
+    UART_OutChar('-');
+    UART_OutChar('-');
+    UART_OutChar('>');
+    UART_InString(string,29);
+    strcpy(str,string);
+    token =strtok(str,"-");
+    if(strcmp(token,"ADCIN")==0){
+#ifdef RECEIVER
+      SPACEFORMATTING
+      resetProducerTask();
+      ADC_Collect(7,SYMBOLRATE*OVERSAMPLING,&producerTask); //Symboltime== Based on system Clock 80000
+#endif
     }
+    else if(strcmp(token,"SEND")==0){
+#ifdef EMITTER
+      token=strtok(NULL,"-");
+      UART_OutChar(CR);
+      UART_OutChar(LF);
+      OS_StartCritical();
+      int ret=write(token,strlen(token));
+      OS_EndCritical();
+      if(ret==0)  UART_OutString("Data sent");
+      else UART_OutString("Data not sent");
+#endif
+    }
+    else if(strcmp(token,"SENDCONT")==0){
+#ifdef EMITTER 
+      token=strtok(NULL,"-");
+      strcpy(comBuffer,token);
+      SPACEFORMATTING
+      NumCreated += OS_AddThread(&sendPeriodicDataTask,128,4);
+#endif
+    }
+
+    UART_OutChar(CR);
+    UART_OutChar(LF);
   }
 }
-int main(void){
-  OS_Init();        // OS Initialization
-  Output_Init();
-  HC05_InitUART();
-  HC05_EnableRXInterrupt();
-  ESP8266_Init(115200);
-  WS2812_Init();
-  Baro_Init();
-  StartBarometer();
 
+void emit_half_bit(void);
+
+int main(void){
+  
+  OS_Init();        // OS Initialization
   GPIO_PortF_Init();
   Running    = 0;        // Log not running
   DataLost   = 0;        // lost data between producer and consumer
   NumSamples = 0;
   Idlecount  = 0;
-  espSendcount=0;
+  count1=0;
   NumCreated = 0;
-  strcpy(ssid,DEFAULT_SSID);
-  strcpy(pw,DEFAULT_PW);
-  
-  OS_AddSW1Task(&SW1_Task,1);
-  
+#ifdef EMITTER
+  OS_AddPeriodicThread(&emit_half_bit,TIME_1S/SYMBOLRATE,3);
+#endif
   // create initial foreground threads
   NumCreated += OS_AddThread(&IdleTask,128,5);  // runs when nothing useful to do
- // NumCreated += OS_AddThread(&WifiTask,128,5);
-  NumCreated += OS_AddThread(&BluetoothTask,128,5);
-  NumCreated += OS_AddThread(&LEDRingTask,128,5);
-  NumCreated += OS_AddThread(&TempTask,128,5);
+  NumCreated += OS_AddThread(&thread1,128,5);
+  //NumCreated += OS_AddThread(&bufferReader,128,4);
+  NumCreated += OS_AddThread(&Interpreter,128,4);
   OS_Launch(TIME_SLICE); // doesn't return, interrupts enabled in here
-  
+
   return -1;             // this never executes
 }

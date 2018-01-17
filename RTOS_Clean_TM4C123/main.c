@@ -75,7 +75,7 @@ uint32_t count1;
 void IdleTask(void){
   
   while(TRUE){
-    RED
+    GREEN
     Idlecount++;        // debugging
     //WaitForInterrupt();
   }
