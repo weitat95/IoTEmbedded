@@ -29,38 +29,16 @@ unsigned short debugBuff[100];
 int i=0;
 unsigned short dataStart=0;
 void printInManchester(int data){
-  if(i>=100){
-    return;
+ if(dataStart==1){
+  if(data==0){
+    printf("0");
+  }else{
+    printf("1");
   }
-
-     if(state>=0){
-      if(data==1){ //01->1
-        if(state==0){
-          debugBuff[i]=1;
-          i++;
-        }
-        state=-1;
-        
-      }
-      else if(data==0){ //10->0
-        if(state==1){
-          debugBuff[i]=0;
-          i++;
-        }
-        state=0;
-      }
-    }else{
-      if(dataStart){
-        state=data;
-      }
-    }
-  if(i>0&&state>=0){
-   
-    printf("%d",debugBuff[i-1]);
-     if(i%10==0){
-      printf("\n\r");
-    }
-  }
+  i++;
+  if(i%4==0) printf(" ");
+  if(i%20==0) printf("\n\r");
+ }
 }
 #endif
 void init_frame(unsigned char * frame){
@@ -129,14 +107,22 @@ void emit_half_bit(){
           if(frame_index < frame_size){
             /*Serial.println(frame_index, DEC);
             Serial.println(frame_buffer[frame_index], HEX);*/
+            #ifdef DEBUG
             dataStart=1;
+            i=0;
+            printf("\n\r");
+            #endif 
             to_manchester(frame_buffer[frame_index], &manchester_data);
             frame_index ++ ;
           }else{
             frame_index = -1 ;
             frame_size = -1 ;
+            #ifdef DEBUG
+            dataStart=0;
+            #endif 
           }
         }
+
         bit_counter = WORD_LENGTH * 2 ;
         //Serial.println(manchester_data, BIN);
       }
