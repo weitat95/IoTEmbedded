@@ -26,8 +26,15 @@
 */
 
 //*****************************************************************************
-// PF1/IDX1 is user input select switch
-// PE1/PWM5 is user input down switch
+
+/*
+To program the emitter for the LIFI please define emitter below
+to program the receiver for the LIFI please define receiver below
+*/
+#define EMITTER
+#define RECEIVER
+
+
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
@@ -38,16 +45,18 @@
 #include "pll.h"
 #include "gpio.h"
 #include "inc/tm4c123gh6pm.h"
-#include "LifiEmitter.h"
-/*
-To program the emitter for the LIFI please define emitter below
-to program the receiver for the LIFI please define receiver below
-*/
-#define EMITTER
-//#define RECEIVER
 
+#ifdef EMITTER
+#include "LifiEmitter.h"
+#endif
+#ifdef RECEIVER
+#include "LifiReceiver.h"
+#endif
+
+#define DEBUG
 #define SYMBOLRATE 1000 //1kHz
-#define OVERSAMPLING 4 //over sampling factor for each manchester symbol
+
+
 #define TIME_SLICE (2*TIME_1MS)
 #define ST7735             
 // PORT B - Memory Mapped GPIO
@@ -99,21 +108,39 @@ void thread1(void){
   }
 }
 #ifdef RECEIVER
+unsigned long fail_counter=0;
+unsigned long producer_counter=0;
 unsigned long buffer[100];
-int i=0;
+int k=0;
 void producerTask(unsigned long data){
-  if(i<100){
-    buffer[i]=data;
-    i++;
+  if(k<100){
+    buffer[k]=data;
+    k++;
   }
 }
 void resetProducerTask(void){
-  i=0;
+  k=0;
 }
 
-void producerTaskFifo(void){
-  
+void producerTaskFifo(unsigned long data){
+	if(OS_Fifo_Put(data)==0){
+		fail_counter++;
+	}
+	producer_counter++;
 }
+void consumerTaskFifo(void){
+	while(1){
+		unsigned long data = OS_Fifo_Get();
+		sample_signal_edge(data);
+	}
+}
+
+void wordDetectedTask(void){
+	while(1){
+		getDataFrame();
+	}
+}
+
 #endif
 
 #ifdef EMITTER
@@ -166,6 +193,9 @@ void Interpreter(void) {
     }
     else if(strcmp(token,"SEND")==0){
 #ifdef EMITTER
+#ifdef DEBUG
+			resetCounter();
+#endif
       token=strtok(NULL,"-");
       UART_OutChar(CR);
       UART_OutChar(LF);
@@ -204,12 +234,19 @@ int main(void){
   NumCreated = 0;
 #ifdef EMITTER
   OS_AddPeriodicThread(&emit_half_bit,TIME_1S/SYMBOLRATE,3);
+	NumCreated += OS_AddThread(&Interpreter,128,4);
+#endif
+#ifdef RECEIVER
+	OS_Fifo_Init(2048);
+	initLifiReceiver();
+  ADC_Collect(7,SYMBOLRATE*OVERSAMPLING,&producerTaskFifo); //Symboltime== Based on system Clock 80000
+	NumCreated += OS_AddThread(&consumerTaskFifo,128,4);
+	NumCreated += OS_AddThread(&wordDetectedTask,128,4);
 #endif
   // create initial foreground threads
   NumCreated += OS_AddThread(&IdleTask,128,5);  // runs when nothing useful to do
-  NumCreated += OS_AddThread(&thread1,128,5);
+  //NumCreated += OS_AddThread(&thread1,128,5);
   //NumCreated += OS_AddThread(&bufferReader,128,4);
-  NumCreated += OS_AddThread(&Interpreter,128,4);
   OS_Launch(TIME_SLICE); // doesn't return, interrupts enabled in here
 
   return -1;             // this never executes

@@ -25,19 +25,47 @@ unsigned long int manchester_data ;
 
 #ifdef DEBUG
 int state=-1;
-unsigned short debugBuff[100];
+unsigned short debugBuff[30];
 int i=0;
+unsigned long dFrameCounter=0;
 unsigned short dataStart=0;
+void resetCounter(void){
+	dFrameCounter=0;
+}
+
 void printInManchester(int data){
  if(dataStart==1){
   if(data==0){
     printf("0");
+		
   }else{
     printf("1");
-  }
+  }	
+	debugBuff[i]=data;
   i++;
-  if(i%4==0) printf(" ");
-  if(i%20==0) printf("\n\r");
+  if((i-2)%4==0) printf(" ");
+	if(i==2) printf(" ");
+	if(i==18) printf(" ");
+  if(i%20==0) {
+		printf("\n\r");
+		for(int j=0;j<20;j+=2){
+			printf(" ");
+			if(debugBuff[j]==0 && debugBuff[j+1]==1){
+				printf("1");
+			}else if(debugBuff[j]==1 &&debugBuff[j+1]==0){
+				printf("0");
+			}
+			if(j==0) {
+				printf("  ");
+			}
+			else if(j%4==0) {
+				printf(" ");
+			}
+		}
+		i=0;
+	}
+	
+	
  }
 }
 #endif
@@ -102,7 +130,7 @@ void emit_half_bit(){
      manchester_data = (manchester_data >> 1);
      if(bit_counter == 0){   
         //is there still bytes to send in the frame ?
-        manchester_data = 0 ; // keep sending ones if nothing to send
+        manchester_data = 0xAAAAAAAA ; // keep sending ones if nothing to send
         if(frame_index >= 0 ){
           if(frame_index < frame_size){
             /*Serial.println(frame_index, DEC);
@@ -111,6 +139,8 @@ void emit_half_bit(){
             dataStart=1;
             i=0;
             printf("\n\r");
+						printf("Data Frame:%u\n\r",dFrameCounter);
+						dFrameCounter++;
             #endif 
             to_manchester(frame_buffer[frame_index], &manchester_data);
             frame_index ++ ;
@@ -119,6 +149,7 @@ void emit_half_bit(){
             frame_size = -1 ;
             #ifdef DEBUG
             dataStart=0;
+						printf("\n\r-->");
             #endif 
           }
         }
