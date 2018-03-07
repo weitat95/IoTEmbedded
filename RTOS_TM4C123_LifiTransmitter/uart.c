@@ -316,13 +316,14 @@ void UART_InString(char *bufPt, uint16_t max)
   character = UART_InChar();
   while(character != CR)
   {
-    if(character == BS)
+    if(character == BS || character == DEL)
     {
       if(length)
       {
         bufPt--;
         length--;
-        UART_OutChar(BS);
+        if(character==BS) UART_OutChar(BS);
+				else if(character== DEL) UART_OutChar(DEL);
       }
     }
     else if(length < max){

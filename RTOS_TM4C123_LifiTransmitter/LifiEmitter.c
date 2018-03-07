@@ -11,7 +11,7 @@
 #define SYNC_SYMBOL 0xD5
 #define ETX 0x03
 #define STX 0x02
-#define DEBUG
+//#define DEBUG
 unsigned char frame_buffer [38] ; //buffer for frame
 char frame_index = -1; // index in frame
 char frame_size = -1  ; // size of the frame to be sent

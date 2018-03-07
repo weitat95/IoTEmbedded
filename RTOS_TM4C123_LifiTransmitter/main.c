@@ -31,7 +31,7 @@
 To program the emitter for the LIFI please define emitter below
 to program the receiver for the LIFI please define receiver below
 */
-#define EMITTER
+//#define EMITTER
 #define RECEIVER
 
 
@@ -44,6 +44,11 @@ to program the receiver for the LIFI please define receiver below
 #include "uart.h"
 #include "pll.h"
 #include "gpio.h"
+
+#ifdef RECEIVER
+#include "ST7735.h"
+#endif
+
 #include "inc/tm4c123gh6pm.h"
 
 #ifdef EMITTER
@@ -53,7 +58,7 @@ to program the receiver for the LIFI please define receiver below
 #include "LifiReceiver.h"
 #endif
 
-#define DEBUG
+//#define DEBUG
 #define SYMBOLRATE 1000 //1kHz
 
 
@@ -123,6 +128,11 @@ void resetProducerTask(void){
 }
 
 void producerTaskFifo(unsigned long data){
+	
+	//if(k<100){
+	//	buffer[k]=data;
+	//	k++;
+	//}
 	if(OS_Fifo_Put(data)==0){
 		fail_counter++;
 	}
@@ -152,9 +162,10 @@ char comBuffer[32];
 void sendPeriodicDataTask(void){
   int n=0;
   int counter=-99;
-  while(n<100){
+  while(1){
     while(sendData(comBuffer)!=0){
-      OS_Sleep(100);
+			strcpy(comBuffer,"1234567890123456789012345678901");
+      OS_Sleep(500);
       counter++;
     }
     printf("Data Sent:%u",n);
@@ -221,30 +232,37 @@ void Interpreter(void) {
 }
 
 void emit_half_bit(void);
-
 int main(void){
   
   OS_Init();        // OS Initialization
   GPIO_PortF_Init();
+#ifdef RECEIVER
+	ST7735_InitR(INITR_REDTAB);
+#endif
   Running    = 0;        // Log not running
   DataLost   = 0;        // lost data between producer and consumer
   NumSamples = 0;
   Idlecount  = 0;
   count1=0;
   NumCreated = 0;
+
 #ifdef EMITTER
   OS_AddPeriodicThread(&emit_half_bit,TIME_1S/SYMBOLRATE,3);
 	NumCreated += OS_AddThread(&Interpreter,128,4);
+	//strcpy(comBuffer,"ABCD");
+	//NumCreated +=OS_AddThread(&sendPeriodicDataTask,128,4);
 #endif
 #ifdef RECEIVER
 	OS_Fifo_Init(2048);
 	initLifiReceiver();
   ADC_Collect(7,SYMBOLRATE*OVERSAMPLING,&producerTaskFifo); //Symboltime== Based on system Clock 80000
 	NumCreated += OS_AddThread(&consumerTaskFifo,128,4);
-	NumCreated += OS_AddThread(&wordDetectedTask,128,4);
+	NumCreated += OS_AddThread(&wordDetectedTask,128,5);
+	//NumCreated += OS_AddThread(&Interpreter,128,4);
+
 #endif
   // create initial foreground threads
-  NumCreated += OS_AddThread(&IdleTask,128,5);  // runs when nothing useful to do
+  NumCreated += OS_AddThread(&IdleTask,128,6);  // runs when nothing useful to do
   //NumCreated += OS_AddThread(&thread1,128,5);
   //NumCreated += OS_AddThread(&bufferReader,128,4);
   OS_Launch(TIME_SLICE); // doesn't return, interrupts enabled in here

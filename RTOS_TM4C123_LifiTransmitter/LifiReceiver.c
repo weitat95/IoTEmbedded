@@ -18,9 +18,19 @@ N times Effective data excluding command symbols, max length 32 bytes
 
 #include "os.h"
 #include "LifiReceiver.h"
-
+#include "ST7735.h"
 #define DEBUG
-
+#define PF1       (*((volatile uint32_t *)0x40025008))
+#define PF2       (*((volatile uint32_t *)0x40025010))
+#define PF3       (*((volatile uint32_t *)0x40025020))
+#define WHITE PF1=0x02; PF2=0x04; PF3=0x08;
+#define RED PF1=0x02; PF2=0; PF3=0;
+#define GREEN PF1=0; PF2=0x00; PF3=0x08;
+#define BLUE PF1=0; PF2=0x04; PF3=0;
+#define YELLOW PF1=0x02; PF2=0x00; PF3=0x08;
+#define PURPLE  PF1=0x02; PF2=0x04; PF3=0;
+#define CYAN PF1=0; PF2=0x04; PF3=0x08;
+#define CLEARCOLOR PF1=0; PF2=0; PF3=0;
 enum receiver_state frame_state = IDLE ;
 Sema4Type semaWordDetected;
 
@@ -103,6 +113,10 @@ int add_byte_to_frame(char * frame_buffer, int * frame_index, int * frame_size, 
     (*frame_size) = 0 ;
     (*frame_state) = SYNC ;
     //Serial.println("SYNC");
+		#ifdef DEBUG
+		printf("SYNCED\n\r");
+		RED
+		#endif
     return 0 ;
   }
   if((*frame_state) != IDLE){ // we are synced
@@ -110,16 +124,35 @@ int add_byte_to_frame(char * frame_buffer, int * frame_index, int * frame_size, 
   (*frame_index) ++ ;
     if(data == STX){
       //Serial.println("START");
+			#ifdef DEBUG
+			printf("START\n\r");
+			GREEN
+			#endif
       (*frame_state) = START ;
        return 0 ;
     }else if(data == ETX){
       //Serial.println("END");
+			ST7735_OutString(1,1,frame_buffer,ST7735_WHITE);
       (*frame_size) = (*frame_index) ;
       (*frame_index) = -1 ;
       (*frame_state) = IDLE ;
       //Serial.println("END");
+			#ifdef DEBUG
+			printf("END\n\r");
+			CLEARCOLOR
+			#endif
        return 1 ;
-    }else if((*frame_index) >= 38){ //frame is larger than max size of frame ...
+    }else if(data == 0xFF){
+			ST7735_OutString(1,1,frame_buffer,ST7735_WHITE);
+			(*frame_size) = (*frame_index);
+			(*frame_index) = -1;
+			(*frame_state) = IDLE;
+			#ifdef DEBUG
+			printf("END\n\r");
+			CLEARCOLOR
+			#endif
+		}
+		else if((*frame_index) >= 38){ //frame is larger than max size of frame ...
       (*frame_index) = -1 ;
       (*frame_size) = -1 ;
       (*frame_state) = IDLE ;
@@ -133,7 +166,7 @@ int add_byte_to_frame(char * frame_buffer, int * frame_index, int * frame_size, 
 }
 
 
-#define EDGE_THRESHOLD (4096-1024) /* Defines the voltage difference between two samples to detect a rising/falling edge. Can be increased depensing on the environment */
+#define EDGE_THRESHOLD (4096-2300) /* Defines the voltage difference between two samples to detect a rising/falling edge. Can be increased depensing on the environment */
 int oldValue = 0 ;
 int steady_count = 0 ;
 int dist_last_sync = 0 ;
@@ -148,7 +181,7 @@ void sample_signal_edge(int readValue){
 #ifdef DEBUG
   //#ifdef DEBUG_ANALOG
   //Serial.println(sensorValue, DEC);
-	//printf("%d",readValue);
+//printf("%d\n\r",readValue);
   //#endif
 #endif
   if((readValue- oldValue) > EDGE_THRESHOLD) edge_val = 1 ;
@@ -173,7 +206,32 @@ void sample_signal_edge(int readValue){
         }
         old_edge_val = edge_val ;
 }
+
 //get the received data frame and decode
+int counter=0;
+unsigned char lastChar=0;
+int flag=0;
+char characterBuff[30];
+void printToST7735(unsigned char * received_data){
+	
+	char character= *received_data;
+	if(lastChar==0x02){
+		flag=1;
+	}else if(lastChar==0x03 ||lastChar==0xFF){
+		flag=0;
+	}
+	if(flag==1){
+		characterBuff[counter]=character;
+		counter++;
+	}else if(flag==0){
+		ST7735_OutString(1,1,characterBuff,ST7735_WHITE);
+		for(int i=0;i<30;i++){
+			characterBuff[i]=0;
+		}
+		counter=0;
+	}
+	lastChar=*received_data;
+}	
 void getDataFrame(void){
 	unsigned char received_data;
   char received_data_print ;
@@ -192,7 +250,7 @@ void getDataFrame(void){
 			}
 			received_data = received_data & 0xFF ;
 #ifdef DEBUG
-      printf("received_data: %#04X: %c",received_data & 0xFF,received_data);
+      printf("received_data: %#04X: %c\n\r",received_data & 0xFF,received_data);
 #endif
     new_word = 0 ;
     if((byte_added = add_byte_to_frame(frameRec_buffer, &frameRec_index, &frameRec_size, &frame_state,received_data)) > 0){
