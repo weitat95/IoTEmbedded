@@ -59,7 +59,7 @@ to program the receiver for the LIFI please define receiver below
 #endif
 
 //#define DEBUG
-#define SYMBOLRATE 1000 //1kHz
+#define SYMBOLRATE 50000 //1kHz
 
 
 #define TIME_SLICE (2*TIME_1MS)
@@ -78,8 +78,10 @@ uint32_t NumCreated;   // number of foreground threads created
 uint32_t NumSamples;   // incremented every sample
 uint32_t DataLost;     // data sent by Producer, but not received by Consumer
 uint32_t Idlecount;
-uint8_t  Running;                // true while robot is running
+uint8_t  Running;                // true while OS is running
 uint32_t count1;
+
+//Color Coding for Launchpad LED
 #define WHITE PF1=0x02; PF2=0x04; PF3=0x08;
 #define RED PF1=0x02; PF2=0; PF3=0;
 #define GREEN PF1=0; PF2=0x00; PF3=0x08;
@@ -116,7 +118,21 @@ void thread1(void){
 unsigned long fail_counter=0;
 unsigned long producer_counter=0;
 unsigned long buffer[100];
+static const unsigned long stabuff[] = {1700,1700,100,100,1700,1700,100,100,1700,1700,100,100,1700,1700,100,100,1700,1700,100,100,
+																				1700,1700,100,100,1700,1700,100,100,1700,1700,100,100,1700,1700,100,100,1700,1700,100,100,
+																				1700,1700,100,100,1700,1700,100,100,1700,1700,100,100,1700,1700,100,100,1700,1700,100,100,
+																				1700,1700,100,100,1700,1700,100,100,1700,1700,100,100,1700,1700,100,100,1700,1700,100,100,
+																				1700,1700,100,100,1700,1700,100,100,1700,1700,100,100,1700,1700,100,100,1700,1700,100,100};
+																				// TODO: Write a High Level Function to convert a byte of Data (0xD5) into binary with wrapping 
+																				//        Taking the Oversampling rate into account as well
+static const unsigned long dataFrame1[] = {1700,100, 1700,100,100,1700, 1700,100,100,1700, 1700,100,100,1700, 1700,100,100,1700, 100,1700, // 0xAA
+																					1700,100, 1700,100,100,1700, 1700,100,100,1700, 1700,100,100,1700, 1700,100,100,1700, 100,1700,  // 0xAA
+																					1700,100, 1700,100,100,1700, 1700,100,100,1700, 1700,100,100,1700, 1700,100,100,1700, 100,1700,	// 0xAA
+																					1700,100, 1700,100,100,1700, 1700,100,100,1700, 1700,100,100,1700, 1700,100,100,1700, 100,1700,	// 0xAA
+																					1700,100, 100,1700,1700,100, 100,1700,1700,100, 100,1700,1700,100, 100,1700,100,1700, 100,1700 // 0xD5 SYNC
+																					};
 int k=0;
+//************************************* Debugging Threads *************************
 void producerTask(unsigned long data){
   if(k<100){
     buffer[k]=data;
@@ -127,6 +143,19 @@ void resetProducerTask(void){
   k=0;
 }
 
+// Debugging the receiver functionality with hardcoded values in a buffer
+void consumerFromBuffer(){
+	for(int m=0;m<100;m++){
+		if(OS_Fifo_Put(stabuff[m])==0){
+			fail_counter++;
+		}
+		producer_counter++;
+	}
+	OS_Kill();
+}
+
+
+//************************************** Final Threads *****************************
 void producerTaskFifo(unsigned long data){
 	
 	//if(k<100){
@@ -138,6 +167,7 @@ void producerTaskFifo(unsigned long data){
 	}
 	producer_counter++;
 }
+
 void consumerTaskFifo(void){
 	while(1){
 		unsigned long data = OS_Fifo_Get();
@@ -195,15 +225,29 @@ void Interpreter(void) {
     UART_InString(string,29);
     strcpy(str,string);
     token =strtok(str,"-");
-    if(strcmp(token,"ADCIN")==0){
+//**************************************** RECEIVER ************************************
 #ifdef RECEIVER
+    if(strcmp(token,"ADCIN")==0){
       SPACEFORMATTING
       resetProducerTask();
       ADC_Collect(7,SYMBOLRATE*OVERSAMPLING,&producerTask); //Symboltime== Based on system Clock 80000
-#endif
     }
-    else if(strcmp(token,"SEND")==0){
+		if(strcmp(token,"ADC2IN")==0){
+      SPACEFORMATTING
+      resetProducerTask();
+      ADC_Collect(7,SYMBOLRATE,&producerTask); //Symboltime== Based on system Clock 80000
+    }
+		if(strcmp(token,"INPUTFROMBUFFER")==0){
+      SPACEFORMATTING
+			NumCreated += OS_AddThread(&consumerFromBuffer,128,4);
+    }
+#endif
+		
+		
+//**************************************** TRANSMITTER ************************************
+
 #ifdef EMITTER
+    if(strcmp(token,"SEND")==0){
 #ifdef DEBUG
 			resetCounter();
 #endif
@@ -215,16 +259,14 @@ void Interpreter(void) {
       OS_EndCritical();
       if(ret==0)  UART_OutString("Data sent");
       else UART_OutString("Data not sent");
-#endif
     }
-    else if(strcmp(token,"SENDCONT")==0){
-#ifdef EMITTER 
+    if(strcmp(token,"SENDCONT")==0){ 
       token=strtok(NULL,"-");
       strcpy(comBuffer,token);
       SPACEFORMATTING
       NumCreated += OS_AddThread(&sendPeriodicDataTask,128,4);
-#endif
     }
+#endif
 
     UART_OutChar(CR);
     UART_OutChar(LF);
@@ -255,10 +297,10 @@ int main(void){
 #ifdef RECEIVER
 	OS_Fifo_Init(2048);
 	initLifiReceiver();
-  ADC_Collect(7,SYMBOLRATE*OVERSAMPLING,&producerTaskFifo); //Symboltime== Based on system Clock 80000
+  //ADC_Collect(7,SYMBOLRATE*OVERSAMPLING,&producerTaskFifo); //Symboltime== Based on system Clock 80000
 	NumCreated += OS_AddThread(&consumerTaskFifo,128,4);
 	NumCreated += OS_AddThread(&wordDetectedTask,128,5);
-	//NumCreated += OS_AddThread(&Interpreter,128,4);
+	NumCreated += OS_AddThread(&Interpreter,128,5);							//Used for debugging of ADC sampling 
 
 #endif
   // create initial foreground threads

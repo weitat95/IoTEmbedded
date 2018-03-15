@@ -34,6 +34,9 @@ N times Effective data excluding command symbols, max length 32 bytes
 enum receiver_state frame_state = IDLE ;
 Sema4Type semaWordDetected;
 
+#define EDGE_THRESHOLD (1500-72)-200 /* Defines the voltage difference between two samples to detect a rising/falling edge. Can be increased depensing on the environment */
+//((Min value of logic High) - (Max value of logic Low)) - guardband //guardband to allow some space to decrease true negative 
+
 #define WORD_LENGTH 10 // a byte is encoded as a 10-bit value with start and stop bits
 #define SYNC_SYMBOL 0xD5 // this symbol breaks the premanble of the frame
 #define ETX 0x03 // End of frame symbol
@@ -166,13 +169,13 @@ int add_byte_to_frame(char * frame_buffer, int * frame_index, int * frame_size, 
 }
 
 
-#define EDGE_THRESHOLD (4096-2300) /* Defines the voltage difference between two samples to detect a rising/falling edge. Can be increased depensing on the environment */
 int oldValue = 0 ;
 int steady_count = 0 ;
 int dist_last_sync = 0 ;
 unsigned int detected_word = 0;
 int new_word = 0;
 char old_edge_val = 0 ;
+int sample_counter =0;
 void sample_signal_edge(int readValue){
   char edge_val ;
   //int sensorValue = analogRead(SENSOR_PIN); // this is too slow and should be replaced with interrupt-driven ADC
@@ -181,9 +184,11 @@ void sample_signal_edge(int readValue){
 #ifdef DEBUG
   //#ifdef DEBUG_ANALOG
   //Serial.println(sensorValue, DEC);
-//printf("%d\n\r",readValue);
+//printf("%d\n\r",readValue); 
   //#endif
 #endif
+	printf("%d: %d\n\r",sample_counter,readValue);
+	sample_counter++;
   if((readValue- oldValue) > EDGE_THRESHOLD) edge_val = 1 ;
   else if((oldValue - readValue) > EDGE_THRESHOLD) edge_val = -1;
   else edge_val = 0 ;
