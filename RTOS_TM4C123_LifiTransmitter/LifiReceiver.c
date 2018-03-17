@@ -33,7 +33,7 @@ N times Effective data excluding command symbols, max length 32 bytes
 #define CLEARCOLOR PF1=0; PF2=0; PF3=0;
 enum receiver_state frame_state = IDLE ;
 Sema4Type semaWordDetected;
-
+Sema4Type semaWordDecoded;
 #define EDGE_THRESHOLD (1500-72)-200 /* Defines the voltage difference between two samples to detect a rising/falling edge. Can be increased depensing on the environment */
 //((Min value of logic High) - (Max value of logic Low)) - guardband //guardband to allow some space to decrease true negative 
 
@@ -87,6 +87,7 @@ int insert_edge( long  * manchester_word, char edge, int edge_period, int * time
                 if(is_a_word_value > 0){ //found start stop framing
                   new_word = 1 ;
 									OS_Signal(&semaWordDetected);
+									OS_Wait(&semaWordDecoded);
                   (*time_from_last_sync) =  0 ;
                   if(is_a_word_value > 1) sync_word_detect = 1 ; //we detected framing and sync word in manchester format
                 }
@@ -102,6 +103,7 @@ int insert_edge( long  * manchester_word, char edge, int edge_period, int * time
              if(sync_word_detect == 0 && is_a_word_value > 0){ //if sync word was detected at previous position, don't take word detection into account
                new_word = 1 ;	
 							 OS_Signal(&semaWordDetected);
+							 OS_Wait(&semaWordDecoded);
                (*time_from_last_sync) =  0 ;
              }
           }else{
@@ -187,7 +189,7 @@ void sample_signal_edge(int readValue){
 //printf("%d\n\r",readValue); 
   //#endif
 #endif
-	printf("%d: %d\n\r",sample_counter,readValue);
+	//printf("%d: %d\n\r",sample_counter,readValue);
 	sample_counter++;
   if((readValue- oldValue) > EDGE_THRESHOLD) edge_val = 1 ;
   else if((oldValue - readValue) > EDGE_THRESHOLD) edge_val = -1;
@@ -204,6 +206,7 @@ void sample_signal_edge(int readValue){
           }
 					if(new_word==1){
 						OS_Signal(&semaWordDetected);
+						OS_Wait(&semaWordDecoded);
 					}
           //if(new_word >= 0){
             steady_count = 0 ;
@@ -264,9 +267,11 @@ void getDataFrame(void){
     }
     //if(frame_state != IDLE) Serial.println(received_data, HEX);
   }
+	OS_Signal(&semaWordDecoded);
 }
 
 void initLifiReceiver(void){
 	OS_InitSemaphore(&semaWordDetected,0);
+	OS_InitSemaphore(&semaWordDecoded,0);
 }
 

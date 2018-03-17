@@ -99,6 +99,25 @@ void to_manchester(unsigned char data, unsigned long int * data_manchester){
   (*data_manchester) |= 0x01 ; //START symbol
 }
 
+void manToAnalogue(unsigned long int *data_manchester, unsigned long *buffer, unsigned long logicHigh, unsigned long logicLow, unsigned short oversampling){
+	if(oversampling<1){
+		oversampling=1;
+	}
+	if(oversampling>4){
+		oversampling=4;
+	}
+	for(int i=0 ; i<20*oversampling; i++){
+			if(*data_manchester & 0x01) {
+				buffer[i]=logicHigh;
+			}else { 
+				buffer[i]=logicLow;
+			}
+			if(oversampling==1 || ((i!=0)&& ((i+1)%oversampling==0) )){ //duplicate the data points to imitate oversampling 1700 1700 1700 1700 (logicHigh, oversampling=4)
+				(*data_manchester = (*data_manchester) >> 1);
+			}
+	}
+}
+
 void initEmitter(void){
   init_frame(frame_buffer);
 }

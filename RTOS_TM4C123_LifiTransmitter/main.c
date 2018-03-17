@@ -33,7 +33,7 @@ to program the receiver for the LIFI please define receiver below
 */
 //#define EMITTER
 #define RECEIVER
-
+#define BUFFERINPUT 1 //If wants buffer input instead of sampling through PD0
 
 #include <stdbool.h>
 #include <stdio.h>
@@ -52,11 +52,23 @@ to program the receiver for the LIFI please define receiver below
 #include "inc/tm4c123gh6pm.h"
 
 #ifdef EMITTER
+
 #include "LifiEmitter.h"
+
 #endif
-#ifdef RECEIVER
+
+#ifdef RECEIVER 
+
 #include "LifiReceiver.h"
+	
+#if BUFFERINPUT
+
+#include "LifiEmitter.h"
+
 #endif
+	
+#endif
+
 
 //#define DEBUG
 #define SYMBOLRATE 50000 //1kHz
@@ -118,19 +130,16 @@ void thread1(void){
 unsigned long fail_counter=0;
 unsigned long producer_counter=0;
 unsigned long buffer[100];
-static const unsigned long stabuff[] = {1700,1700,100,100,1700,1700,100,100,1700,1700,100,100,1700,1700,100,100,1700,1700,100,100,
-																				1700,1700,100,100,1700,1700,100,100,1700,1700,100,100,1700,1700,100,100,1700,1700,100,100,
-																				1700,1700,100,100,1700,1700,100,100,1700,1700,100,100,1700,1700,100,100,1700,1700,100,100,
-																				1700,1700,100,100,1700,1700,100,100,1700,1700,100,100,1700,1700,100,100,1700,1700,100,100,
-																				1700,1700,100,100,1700,1700,100,100,1700,1700,100,100,1700,1700,100,100,1700,1700,100,100};
-																				// TODO: Write a High Level Function to convert a byte of Data (0xD5) into binary with wrapping 
-																				//        Taking the Oversampling rate into account as well
-static const unsigned long dataFrame1[] = {1700,100, 1700,100,100,1700, 1700,100,100,1700, 1700,100,100,1700, 1700,100,100,1700, 100,1700, // 0xAA
-																					1700,100, 1700,100,100,1700, 1700,100,100,1700, 1700,100,100,1700, 1700,100,100,1700, 100,1700,  // 0xAA
-																					1700,100, 1700,100,100,1700, 1700,100,100,1700, 1700,100,100,1700, 1700,100,100,1700, 100,1700,	// 0xAA
-																					1700,100, 1700,100,100,1700, 1700,100,100,1700, 1700,100,100,1700, 1700,100,100,1700, 100,1700,	// 0xAA
-																					1700,100, 100,1700,1700,100, 100,1700,1700,100, 100,1700,1700,100, 100,1700,100,1700, 100,1700 // 0xD5 SYNC
-																					};
+#if BUFFERINPUT
+#define HIGH 1700
+#define LOW 100
+
+static const unsigned long idleFrame[] = {HIGH,LOW, HIGH,LOW,LOW,HIGH, HIGH,LOW,LOW,HIGH, HIGH,LOW,LOW,HIGH, HIGH,LOW,LOW,HIGH, LOW,HIGH}; //0xAA IDLE
+static const unsigned long preambleFrame[] = {HIGH,LOW, LOW,HIGH,HIGH,LOW, LOW,HIGH,HIGH,LOW, LOW,HIGH,HIGH,LOW, LOW,HIGH,LOW,HIGH, LOW,HIGH}; //0xD5 SYNC
+static const unsigned long startFrame[] = {HIGH,LOW, HIGH,LOW,LOW,HIGH, HIGH,LOW,HIGH,LOW, HIGH,LOW,HIGH,LOW, HIGH,LOW,HIGH,LOW, LOW,HIGH}; //0x02 STX
+static const unsigned long endFrame[] = {HIGH,LOW, LOW,HIGH,LOW,HIGH, HIGH,LOW,HIGH,LOW, HIGH,LOW,HIGH,LOW, HIGH,LOW,HIGH,LOW, LOW,HIGH}; //0x03 ETX
+unsigned long dataFrame1[] = {HIGH,LOW, LOW,HIGH,HIGH,LOW, HIGH,LOW,HIGH,LOW, HIGH,LOW,HIGH,LOW, LOW,HIGH,HIGH,LOW, LOW,HIGH}; //0x41 'A'
+#endif
 int k=0;
 //************************************* Debugging Threads *************************
 void producerTask(unsigned long data){
@@ -142,41 +151,67 @@ void producerTask(unsigned long data){
 void resetProducerTask(void){
   k=0;
 }
+#if BUFFERINPUT
+
+// Helper function
+void inputFrameIntoOSFifo(const unsigned long * frame){
+	int n=0;
+	for(int m=0;m<20*OVERSAMPLING;m++){
+		if(n==20){
+			while(1){
+				; //n shouldn't be more than frame size
+			}
+		}
+		if(OS_Fifo_Put(frame[n])==0){
+			fail_counter++;
+		}
+		if( (m+1)%OVERSAMPLING==0 || OVERSAMPLING==1   ){
+			n++;
+		}
+		producer_counter++;
+	}		
+}
+
+void changeDataFrame1(char character){
+	unsigned long int dataa=0;
+	to_manchester(character, &dataa);
+	manToAnalogue(&dataa, dataFrame1, HIGH, LOW ,1);
+}
 
 // Debugging the receiver functionality with hardcoded values in a buffer
 void consumerFromBuffer(){
-	for(int m=0;m<100;m++){
-		if(OS_Fifo_Put(stabuff[m])==0){
-			fail_counter++;
-		}
-		producer_counter++;
-	}
+	inputFrameIntoOSFifo(idleFrame);
+	inputFrameIntoOSFifo(preambleFrame);
+	inputFrameIntoOSFifo(startFrame);
+	inputFrameIntoOSFifo(dataFrame1);
+	inputFrameIntoOSFifo(dataFrame1);
+	inputFrameIntoOSFifo(dataFrame1);
+	inputFrameIntoOSFifo(endFrame);
 	OS_Kill();
 }
 
+#endif
 
 //************************************** Final Threads *****************************
 void producerTaskFifo(unsigned long data){
-	
-	//if(k<100){
-	//	buffer[k]=data;
-	//	k++;
-	//}
+
 	if(OS_Fifo_Put(data)==0){
 		fail_counter++;
 	}
 	producer_counter++;
 }
-
+int consumerTaskCounter=0;
 void consumerTaskFifo(void){
 	while(1){
+		consumerTaskCounter++;
 		unsigned long data = OS_Fifo_Get();
 		sample_signal_edge(data);
 	}
 }
-
+int wordDetectedTaskCounter=0;
 void wordDetectedTask(void){
 	while(1){
+		wordDetectedTaskCounter++;
 		getDataFrame();
 	}
 }
@@ -208,7 +243,7 @@ void sendPeriodicDataTask(void){
 }
 #endif
 char string[32];
-
+unsigned long bufferInput[100];
 void Interpreter(void) {
   char str[32];
   char *token;
@@ -237,10 +272,38 @@ void Interpreter(void) {
       resetProducerTask();
       ADC_Collect(7,SYMBOLRATE,&producerTask); //Symboltime== Based on system Clock 80000
     }
+#if BUFFERINPUT
 		if(strcmp(token,"INPUTFROMBUFFER")==0){
       SPACEFORMATTING
 			NumCreated += OS_AddThread(&consumerFromBuffer,128,4);
     }
+		
+		if(strcmp(token,"CONVERT")==0){
+			unsigned long int dataa=0;
+			SPACEFORMATTING
+			token=strtok(NULL,"-");
+			to_manchester(token[0], &dataa);
+			manToAnalogue(&dataa, bufferInput, 1, 0 ,1);
+			for(int i=0;i<20;i++){
+				if(bufferInput[i]==1){
+					UART_OutChar('1');
+				}else {
+					UART_OutChar('0');
+				}
+				
+				UART_OutChar(' ');
+			  if(i==1 || i==5 || i==9 ||i==13 ||i==17){
+					UART_OutChar(',');
+				}
+			}
+		}
+		if(strcmp(token,"CHANGEBUFFER")==0){
+			SPACEFORMATTING
+			token=strtok(NULL,"-");
+			changeDataFrame1(token[0]);
+		}
+#endif
+		
 #endif
 		
 		
@@ -297,11 +360,15 @@ int main(void){
 #ifdef RECEIVER
 	OS_Fifo_Init(2048);
 	initLifiReceiver();
-  //ADC_Collect(7,SYMBOLRATE*OVERSAMPLING,&producerTaskFifo); //Symboltime== Based on system Clock 80000
-	NumCreated += OS_AddThread(&consumerTaskFifo,128,4);
-	NumCreated += OS_AddThread(&wordDetectedTask,128,5);
+	// Final Thread
+#if !BUFFERINPUT
+	ADC_Collect(7,SYMBOLRATE*OVERSAMPLING,&producerTaskFifo); //Symboltime== Based on system Clock 80000
+#endif
+	//Debugging Thread
 	NumCreated += OS_AddThread(&Interpreter,128,5);							//Used for debugging of ADC sampling 
-
+	// Core Threads
+	NumCreated += OS_AddThread(&consumerTaskFifo,128,4);
+	NumCreated += OS_AddThread(&wordDetectedTask,128,3);
 #endif
   // create initial foreground threads
   NumCreated += OS_AddThread(&IdleTask,128,6);  // runs when nothing useful to do

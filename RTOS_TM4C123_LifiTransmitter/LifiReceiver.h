@@ -1,5 +1,5 @@
 #include <stdint.h>
-#define OVERSAMPLING 2 //over sampling factor for each manchester symbol
+#define OVERSAMPLING 4 //over sampling factor for each manchester symbol
 //PD0 As logic input
 enum receiver_state {
   IDLE, //waiting for sync
