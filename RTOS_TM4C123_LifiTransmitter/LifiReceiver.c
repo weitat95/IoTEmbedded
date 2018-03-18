@@ -78,8 +78,9 @@ int insert_edge( long  * manchester_word, char edge, int edge_period, int * time
    int new_word = 0 ;
    int is_a_word_value = 0 ;
    int sync_word_detect = 0 ;
-   if( ((*manchester_word) & 0x01) != edge ){ //mak sure we don't have same edge ...
-             if(edge_period > (OVERSAMPLING+1)){
+   if( ((*manchester_word) & 0x01) != edge ){ //make sure we don't have same edge ...
+//		 printf("EDGE:%d",edge);
+             if(edge_period > (OVERSAMPLING	)){
                 unsigned char last_bit = (*manchester_word) & 0x01 ;
                 (*manchester_word) = ((*manchester_word) << 1) | last_bit ; // signal was steady for longer than a single symbol, 
                 (*time_from_last_sync) += 1 ;
@@ -195,7 +196,7 @@ void sample_signal_edge(int readValue){
   else if((oldValue - readValue) > EDGE_THRESHOLD) edge_val = -1;
   else edge_val = 0 ;
   oldValue = readValue ;
-  if(edge_val == 0 || edge_val == old_edge_val || (edge_val != old_edge_val && steady_count < 2)){
+  if(edge_val == 0 || edge_val == old_edge_val || (edge_val != old_edge_val && steady_count < OVERSAMPLING/2)){
     if( steady_count < (4 * OVERSAMPLING)){
       steady_count ++ ;
     }
@@ -213,6 +214,8 @@ void sample_signal_edge(int readValue){
           //}
         }
         old_edge_val = edge_val ;
+			//if(steady_count==0){printf("\n\r");}
+			//	printf("\n\rSample:%d, Value:%d, Steady_Count:%d, dist_last_sync:%d",sample_counter,readValue,steady_count,dist_last_sync);
 }
 
 //get the received data frame and decode
