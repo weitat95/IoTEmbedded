@@ -58,9 +58,9 @@ to program the receiver for the LIFI please define receiver below
 #endif
 
 #ifdef RECEIVER 
-
+int oversampling = 2;
 #include "LifiReceiver.h"
-	
+
 #if BUFFERINPUT
 
 #include "LifiEmitter.h"
@@ -156,7 +156,7 @@ void resetProducerTask(void){
 // Helper function
 void inputFrameIntoOSFifo(const unsigned long * frame){
 	int n=0;
-	for(int m=0;m<20*OVERSAMPLING;m++){
+	for(int m=0;m<20*oversampling;m++){
 		if(n==20){
 			while(1){
 				; //n shouldn't be more than frame size
@@ -165,7 +165,7 @@ void inputFrameIntoOSFifo(const unsigned long * frame){
 		if(OS_Fifo_Put(frame[n])==0){
 			fail_counter++;
 		}
-		if( (m+1)%OVERSAMPLING==0 || OVERSAMPLING==1   ){
+		if( (m+1)%oversampling==0 || oversampling==1   ){
 			n++;
 		}
 		producer_counter++;
@@ -265,7 +265,7 @@ void Interpreter(void) {
     if(strcmp(token,"ADCIN")==0){
       SPACEFORMATTING
       resetProducerTask();
-      ADC_Collect(7,SYMBOLRATE*OVERSAMPLING,&producerTask); //Symboltime== Based on system Clock 80000
+      ADC_Collect(7,SYMBOLRATE*oversampling,&producerTask); //Symboltime== Based on system Clock 80000
     }
 		if(strcmp(token,"ADC2IN")==0){
       SPACEFORMATTING
@@ -337,6 +337,13 @@ void Interpreter(void) {
 }
 
 void emit_half_bit(void);
+
+void SW1Push1(void){
+  
+}
+
+//******************************************* MAIN FUNCTION ******************************
+
 int main(void){
   
   OS_Init();        // OS Initialization
@@ -359,10 +366,10 @@ int main(void){
 #endif
 #ifdef RECEIVER
 	OS_Fifo_Init(2048);
-	initLifiReceiver();
+	initLifiReceiver(oversampling);
 	// Final Thread
 #if !BUFFERINPUT
-	ADC_Collect(7,SYMBOLRATE*OVERSAMPLING,&producerTaskFifo); //Symboltime== Based on system Clock 80000
+	ADC_Collect(7,SYMBOLRATE*oversampling,&producerTaskFifo); //Symboltime== Based on system Clock 80000
 #endif
 	//Debugging Thread
 	NumCreated += OS_AddThread(&Interpreter,128,5);							//Used for debugging of ADC sampling 
@@ -371,6 +378,7 @@ int main(void){
 	NumCreated += OS_AddThread(&wordDetectedTask,128,3);
 #endif
   // create initial foreground threads
+	//OS_AddSW1Task(&SW1Push1,2);
   NumCreated += OS_AddThread(&IdleTask,128,6);  // runs when nothing useful to do
   //NumCreated += OS_AddThread(&thread1,128,5);
   //NumCreated += OS_AddThread(&bufferReader,128,4);

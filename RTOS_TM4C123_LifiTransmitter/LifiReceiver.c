@@ -50,6 +50,9 @@ char frameRec_buffer[38] ;
 int frameRec_index  = -1 ;
 int frameRec_size = -1 ;
 
+//oversampling factor
+int oversamplingR = 4;
+
 
 #define START_SYMBOL 0x02
 #define STOP_SYMBOL 0x01
@@ -80,7 +83,7 @@ int insert_edge( long  * manchester_word, char edge, int edge_period, int * time
    int sync_word_detect = 0 ;
    if( ((*manchester_word) & 0x01) != edge ){ //make sure we don't have same edge ...
 //		 printf("EDGE:%d",edge);
-             if(edge_period > (OVERSAMPLING	)){
+             if(edge_period > (oversamplingR	)){
                 unsigned char last_bit = (*manchester_word) & 0x01 ;
                 (*manchester_word) = ((*manchester_word) << 1) | last_bit ; // signal was steady for longer than a single symbol, 
                 (*time_from_last_sync) += 1 ;
@@ -177,7 +180,7 @@ int steady_count = 0 ;
 int dist_last_sync = 0 ;
 unsigned int detected_word = 0;
 int new_word = 0;
-char old_edge_val = 0 ;
+char old_edge_val = 0;
 int sample_counter =0;
 void sample_signal_edge(int readValue){
   char edge_val ;
@@ -196,13 +199,13 @@ void sample_signal_edge(int readValue){
   else if((oldValue - readValue) > EDGE_THRESHOLD) edge_val = -1;
   else edge_val = 0 ;
   oldValue = readValue ;
-  if(edge_val == 0 || edge_val == old_edge_val || (edge_val != old_edge_val && steady_count < OVERSAMPLING/2)){
-    if( steady_count < (4 * OVERSAMPLING)){
+  if(edge_val == 0 || edge_val == old_edge_val || (edge_val != old_edge_val && steady_count < oversamplingR/2)){
+    if( steady_count < (4 * oversamplingR)){
       steady_count ++ ;
     }
   }else{  
           new_word = insert_edge(&shift_reg, edge_val, steady_count, &(dist_last_sync), &detected_word); 
-          if(dist_last_sync > (8*OVERSAMPLING)){ // limit dist_last_sync to avoid overflow problems
+          if(dist_last_sync > (8*oversamplingR)){ // limit dist_last_sync to avoid overflow problems
             dist_last_sync = 32 ;
           }
 					if(new_word==1){
@@ -273,8 +276,9 @@ void getDataFrame(void){
 	OS_Signal(&semaWordDecoded);
 }
 
-void initLifiReceiver(void){
+void initLifiReceiver(int oversamplingFactor){
 	OS_InitSemaphore(&semaWordDetected,0);
 	OS_InitSemaphore(&semaWordDecoded,0);
+	oversamplingR=oversamplingFactor;
 }
 

@@ -475,11 +475,6 @@
               <FilePath>.\LifiEmitter.c</FilePath>
             </File>
             <File>
-              <FileName>LifiReceiver.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>.\LifiReceiver.c</FilePath>
-            </File>
-            <File>
               <FileName>LifiReceiver.h</FileName>
               <FileType>5</FileType>
               <FilePath>.\LifiReceiver.h</FilePath>
@@ -493,6 +488,11 @@
               <FileName>eDisk.c</FileName>
               <FileType>1</FileType>
               <FilePath>.\eDisk.c</FilePath>
+            </File>
+            <File>
+              <FileName>LifiReceiver.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\LifiReceiver.c</FilePath>
             </File>
           </Files>
         </Group>
