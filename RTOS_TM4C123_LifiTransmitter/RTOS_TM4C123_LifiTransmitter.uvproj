@@ -499,6 +499,16 @@
               <FileType>1</FileType>
               <FilePath>.\DAC.c</FilePath>
             </File>
+            <File>
+              <FileName>ff.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\ff.c</FilePath>
+            </File>
+            <File>
+              <FileName>efile.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\efile.c</FilePath>
+            </File>
           </Files>
         </Group>
       </Groups>

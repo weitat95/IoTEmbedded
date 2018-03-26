@@ -33,9 +33,9 @@ to program the receiver for the LIFI please define receiver below
 */
 //#define EMITTER
 #define RECEIVER
-#define BUFFERINPUT 0 //If wants buffer input instead of sampling through PD0
-#define AUDIOOUT 1 //Outputing audio to output (GPIO PORT TO BE DEFINED)
-
+#define BUFFERINPUT 1 //If wants buffer input instead of sampling through PD0
+#define AUDIOOUT 0 //Outputing audio to output (GPIO PORT TO BE DEFINED)
+#define SDDEBUG 1 //Enable SD Card Debugging 
 
 #include <stdbool.h>
 #include <stdio.h>
@@ -46,13 +46,9 @@ to program the receiver for the LIFI please define receiver below
 #include "uart.h"
 #include "pll.h"
 #include "gpio.h"
-
-struct BYTE { 
-    uint8_t x; 
-};
-
-typedef struct BYTE BYTE;
-
+#include "ff.h"
+#include "efile.h"
+#include "eDisk.h"
 #ifdef RECEIVER
 #include "ST7735.h"
 #include "DAC.h"
@@ -112,7 +108,13 @@ uint32_t count1;
 #define CYAN PF1=0; PF2=0x04; PF3=0x08;
 
 #define SPACEFORMATTING UART_OutChar(CR); UART_OutChar(LF);
-
+char str[50];
+void diskError(char* errtype, unsigned long n){
+  UART_OutString(errtype);
+  sprintf(str," disk error %u",n);
+  UART_OutString(str);
+  OS_Kill();
+}
 
 //******** IdleTask  ***************
 // foreground thread, runs when no other work needed
@@ -139,6 +141,7 @@ void thread1(void){
 unsigned long fail_counter=0;
 unsigned long producer_counter=0;
 unsigned long buffer[100];
+unsigned char bufferFile[512];
 #if BUFFERINPUT
 #define HIGH 1700
 #define LOW 100
@@ -293,6 +296,10 @@ void producerTask(unsigned long data){
 void resetProducerTask(void){
   k=0;
 }
+#if SDDEBUG
+
+
+#endif
 #if BUFFERINPUT
 
 // Helper function
@@ -357,7 +364,7 @@ void wordDetectedTask(void){
 		getDataFrame();
 	}
 }
-#ifdef AUDIOOUT
+#if AUDIOOUT
 void audioOutThread(void){
 	while(1){
 		for(int i=0;i<NUM_ELEMENTS;i++){
@@ -395,6 +402,12 @@ void sendPeriodicDataTask(void){
 #endif
 char string[32];
 unsigned long bufferInput[100];
+
+//Globals for File Systems
+static FATFS g_sFatFs;
+FIL Handle,Handle2;
+FRESULT fresult;
+
 void Interpreter(void) {
   char str[32];
   char *token;
@@ -411,6 +424,41 @@ void Interpreter(void) {
     UART_InString(string,29);
     strcpy(str,string);
     token =strtok(str,"-");
+//**************************************** SD CARD DEBUGGING ***************************
+
+#if SDDEBUG
+		if(strcmp(token,"SDREAD")==0){
+			int i;  UINT n;			
+			SPACEFORMATTING
+			fresult = f_mount(0, &g_sFatFs);
+			UART_OutString("Mounted FS\n\r");
+			if(fresult) diskError("f_mount",0);
+			// assumes there is a short text file named file5.txt
+			fresult = f_open(&Handle,"file5.txt", FA_READ);
+			if(fresult) diskError("f_open",0);
+			UART_OutString("Opened file5.txt\n\r");
+			i=0;
+			UART_OutString("Start Reading..\n\r");
+			do{
+				fresult = f_read(&Handle,&bufferFile[i],1,&n);
+				if(fresult) diskError("f_read",0);
+				i++;
+			} while((n==1)&&(i<511));
+			bufferFile[i] = 0; // null termination
+			UART_OutString("Done Reading into Buffer\n\r");
+			fresult = f_close(&Handle);
+			if(fresult) diskError("f_close",0);
+			UART_OutString("File Closed\n\r");
+			fresult = f_mount(0,0); //Unmount
+			if(fresult) diskError("f_unmount",0);
+			UART_OutString("Unmount Fs\n\r");
+			UART_OutString("Done ReadTest Task\n\r");
+			token=strtok(NULL,"-");
+			ST7735_OutString(0,0,token,ST7735_WHITE);
+
+			continue;
+		}
+#endif
 //**************************************** RECEIVER ************************************
 #ifdef RECEIVER
     if(strcmp(token,"ADCIN")==0){
@@ -423,17 +471,20 @@ void Interpreter(void) {
 			for(int i=0;i<100;i++){
 				printf("\n\r%d",buffer[i]);
 			}
+			continue;
     }
 		if(strcmp(token,"ADC2IN")==0){
       SPACEFORMATTING
       resetProducerTask();
       ADC_Collect(7,SYMBOLRATE,&producerTask); //Symboltime== Based on system Clock 80000
-    }
+			continue;
+		}
 #if BUFFERINPUT
 		if(strcmp(token,"INPUTFROMBUFFER")==0){
       SPACEFORMATTING
 			NumCreated += OS_AddThread(&consumerFromBuffer,128,4);
-    }
+			continue;
+		}
 		
 		if(strcmp(token,"CONVERT")==0){
 			unsigned long int dataa=0;
@@ -453,11 +504,13 @@ void Interpreter(void) {
 					UART_OutChar(',');
 				}
 			}
+			continue;
 		}
 		if(strcmp(token,"CHANGEBUFFER")==0){
 			SPACEFORMATTING
 			token=strtok(NULL,"-");
 			changeDataFrame1(token[0]);
+			continue;
 		}
 #endif
 		
@@ -514,6 +567,7 @@ int main(void){
   Idlecount  = 0;
   count1=0;
   NumCreated = 0;
+	OS_AddPeriodicThread(&disk_timerproc,10*TIME_1MS,0);   // time out routines for disk
 
 #ifdef EMITTER
   OS_AddPeriodicThread(&emit_half_bit,TIME_1S/SYMBOLRATE,3);
@@ -530,9 +584,10 @@ int main(void){
 	// Core Threads
 	NumCreated += OS_AddThread(&consumerTaskFifo,128,4);
 	NumCreated += OS_AddThread(&wordDetectedTask,128,3);
-#ifdef AUDIOOUT
+#if AUDIOOUT
 	NumCreated += OS_AddThread(&audioOutThread,128,5);
 #endif
+
 
 
 #endif
@@ -544,7 +599,6 @@ int main(void){
 	// Final Thread
 	#ifdef RECEIVER
 #if !BUFFERINPUT
-
 	ADC_Collect(7,SYMBOLRATE*oversampling,&producerTaskFifo); //Symboltime== Based on system Clock 80000
 #endif
 #endif

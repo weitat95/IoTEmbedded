@@ -44,11 +44,9 @@ typedef signed long		LONG;
 typedef unsigned long	ULONG;
 typedef unsigned long	DWORD;
 
-
 /**
  * \brief Boolean type
  */
-typedef enum { FALSE = 0, TRUE } BOOL;
 
 /**
  * \brief Status of Disk Functions
