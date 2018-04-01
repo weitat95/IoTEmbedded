@@ -34,7 +34,7 @@ N times Effective data excluding command symbols, max length 32 bytes
 enum receiver_state frame_state = IDLE ;
 Sema4Type semaWordDetected;
 Sema4Type semaWordDecoded;
-#define EDGE_THRESHOLD (1500-72)-200 /* Defines the voltage difference between two samples to detect a rising/falling edge. Can be increased depensing on the environment */
+#define EDGE_THRESHOLD (2500) /* Defines the voltage difference between two samples to detect a rising/falling edge. Can be increased depensing on the environment */
 //((Min value of logic High) - (Max value of logic Low)) - guardband //guardband to allow some space to decrease true negative 
 
 #define WORD_LENGTH 10 // a byte is encoded as a 10-bit value with start and stop bits
@@ -51,7 +51,7 @@ int frameRec_index  = -1 ;
 int frameRec_size = -1 ;
 
 //oversampling factor
-int oversamplingR = 4;
+int oversamplingR = 2;
 
 
 #define START_SYMBOL 0x02
@@ -83,7 +83,7 @@ int insert_edge( long  * manchester_word, char edge, int edge_period, int * time
    int sync_word_detect = 0 ;
    if( ((*manchester_word) & 0x01) != edge ){ //make sure we don't have same edge ...
 //		 printf("EDGE:%d",edge);
-             if(edge_period > (oversamplingR	)){
+             if(edge_period > (oversamplingR+1)){
                 unsigned char last_bit = (*manchester_word) & 0x01 ;
                 (*manchester_word) = ((*manchester_word) << 1) | last_bit ; // signal was steady for longer than a single symbol, 
                 (*time_from_last_sync) += 1 ;
@@ -141,7 +141,7 @@ int add_byte_to_frame(char * frame_buffer, int * frame_index, int * frame_size, 
        return 0 ;
     }else if(data == ETX){
       //Serial.println("END");
-			ST7735_OutString(1,1,frame_buffer,ST7735_WHITE);
+			//ST7735_OutString(1,1,frame_buffer,ST7735_WHITE);
       (*frame_size) = (*frame_index) ;
       (*frame_index) = -1 ;
       (*frame_state) = IDLE ;
@@ -152,7 +152,7 @@ int add_byte_to_frame(char * frame_buffer, int * frame_index, int * frame_size, 
 			#endif
        return 1 ;
     }else if(data == 0xFF){
-			ST7735_OutString(1,1,frame_buffer,ST7735_WHITE);
+			//ST7735_OutString(1,1,frame_buffer,ST7735_WHITE);
 			(*frame_size) = (*frame_index);
 			(*frame_index) = -1;
 			(*frame_state) = IDLE;
@@ -264,7 +264,7 @@ void getDataFrame(void){
 			}
 			received_data = received_data & 0xFF ;
 #ifdef DEBUG
-      printf("received_data: %#04X: %c\n\r",received_data & 0xFF,received_data);
+      //printf("received_data: %#04X: %c\n\r",received_data & 0xFF,received_data);
 #endif
     new_word = 0 ;
     if((byte_added = add_byte_to_frame(frameRec_buffer, &frameRec_index, &frameRec_size, &frame_state,received_data)) > 0){

@@ -24,6 +24,34 @@
 *  - TA Spring 2017             : Kishore Punniyamurthy
 *
 */
+//*****************************************************************************
+//***************************** Connections ***********************************
+/*
+******Transmitter******
+LED Input - GPIO PF2
+******Receiver*********
+ADCSampler- GPIO PD2 
+******ST7735***
+VCC 			- 3.3V
+GND 			- GND
+CS  			- PA3
+RESET 		- PA7
+A0(DATA)	- PA6
+SDA(MOSI)	- PA5
+SCK				-PA2
+LED				-3.3V
+*******SDCARD***
+SDCS      - PB0
+SDMOSI		- PA5
+SDMISO		- PA4
+SDSCK			- PA2
+******DAC*******
+SSI1Clk (SCLK, pin 4) connected to PD0
+SSI1Fss (!CS, pin 2) connected to PD1
+SSI1Tx (DIN, pin 3) connected to PD3
+******Switch****
+
+*/
 
 //*****************************************************************************
 
@@ -33,8 +61,8 @@ to program the receiver for the LIFI please define receiver below
 */
 //#define EMITTER
 #define RECEIVER
-#define BUFFERINPUT 1 //If wants buffer input instead of sampling through PD0
-#define AUDIOOUT 0 //Outputing audio to output (GPIO PORT TO BE DEFINED)
+#define BUFFERINPUT 1 //If wants buffer input instead of sampling
+#define AUDIOOUT 1 //Outputing audio to output (GPIO PORT TO BE DEFINED)
 #define SDDEBUG 1 //Enable SD Card Debugging 
 
 #include <stdbool.h>
@@ -49,12 +77,20 @@ to program the receiver for the LIFI please define receiver below
 #include "ff.h"
 #include "efile.h"
 #include "eDisk.h"
+#include "inc/tm4c123gh6pm.h"
+
 #ifdef RECEIVER
-#include "ST7735.h"
-#include "DAC.h"
+
+	#include "ST7735.h"
+	#include "DAC.h"
+	#include "LifiReceiver.h"
+	#define RECINPUT 5 //Channel 5 PD2 (Channel defined in adct0atrigger.c)
+	int oversampling = 2;
+	#if BUFFERINPUT
+		#include "LifiEmitter.h"
+	#endif
 #endif
 
-#include "inc/tm4c123gh6pm.h"
 
 #ifdef EMITTER
 
@@ -62,21 +98,9 @@ to program the receiver for the LIFI please define receiver below
 
 #endif
 
-#ifdef RECEIVER 
-int oversampling = 2;
-#include "LifiReceiver.h"
-
-#if BUFFERINPUT
-
-#include "LifiEmitter.h"
-
-#endif
-	
-#endif
-
 
 //#define DEBUG
-#define SYMBOLRATE 50000 //1kHz
+#define SYMBOLRATE 10000 //1kHz
 
 
 #define TIME_SLICE (2*TIME_1MS)
@@ -140,10 +164,10 @@ void thread1(void){
 #ifdef RECEIVER
 unsigned long fail_counter=0;
 unsigned long producer_counter=0;
-unsigned long buffer[100];
+unsigned long buffer[500];
 unsigned char bufferFile[512];
 #if BUFFERINPUT
-#define HIGH 1700
+#define HIGH 4000
 #define LOW 100
 
 static const unsigned long idleFrame[] = {HIGH,LOW, HIGH,LOW,LOW,HIGH, HIGH,LOW,LOW,HIGH, HIGH,LOW,LOW,HIGH, HIGH,LOW,LOW,HIGH, LOW,HIGH}; //0xAA IDLE
@@ -329,6 +353,7 @@ void changeDataFrame1(char character){
 
 // Debugging the receiver functionality with hardcoded values in a buffer
 void consumerFromBuffer(){
+	while(1){
 	inputFrameIntoOSFifo(idleFrame);
 	inputFrameIntoOSFifo(preambleFrame);
 	inputFrameIntoOSFifo(startFrame);
@@ -336,24 +361,40 @@ void consumerFromBuffer(){
 	inputFrameIntoOSFifo(dataFrame1);
 	inputFrameIntoOSFifo(dataFrame1);
 	inputFrameIntoOSFifo(endFrame);
+		OS_Sleep(1000);
+	}
 	OS_Kill();
 }
 
 #endif
-
 //************************************** Final Threads *****************************
 void producerTaskFifo(unsigned long data){
-
-	if(OS_Fifo_Put(data)==0){
-		fail_counter++;
-	}
-	producer_counter++;
+		if(OS_Fifo_Put(data)==0){
+			fail_counter++;
+		}
+		producer_counter++;
 }
+void startSampling(void){
+	OS_Sleep(5000);
+	ADC_Collect(RECINPUT,SYMBOLRATE*oversampling,&producerTaskFifo); //Symboltime== Based on system Clock 80000
+	OS_Kill();
+}
+
 int consumerTaskCounter=0;
 void consumerTaskFifo(void){
 	while(1){
 		consumerTaskCounter++;
 		unsigned long data = OS_Fifo_Get();
+		if(k<500){
+		buffer[k]=data;
+		k++;}
+		else if(k==500){	
+			for(int i=0;i<500;i++){
+				
+				printf("%d\n\r",buffer[i]);
+			}
+			OS_Kill();
+		}
 		sample_signal_edge(data);
 	}
 }
@@ -464,7 +505,7 @@ void Interpreter(void) {
     if(strcmp(token,"ADCIN")==0){
       SPACEFORMATTING
       resetProducerTask();
-      ADC_Collect(7,SYMBOLRATE*oversampling,&producerTask); //Symboltime== Based on system Clock 80000
+      ADC_Collect(RECINPUT,SYMBOLRATE*oversampling,&producerTask); //Symboltime== Based on system Clock 80000
 			while(k<100){
 				;
 			}
@@ -476,7 +517,7 @@ void Interpreter(void) {
 		if(strcmp(token,"ADC2IN")==0){
       SPACEFORMATTING
       resetProducerTask();
-      ADC_Collect(7,SYMBOLRATE,&producerTask); //Symboltime== Based on system Clock 80000
+      ADC_Collect(RECINPUT,SYMBOLRATE,&producerTask); //Symboltime== Based on system Clock 80000
 			continue;
 		}
 #if BUFFERINPUT
@@ -559,7 +600,7 @@ int main(void){
   OS_Init();        // OS Initialization
   GPIO_PortF_Init();
 #ifdef RECEIVER
-	ST7735_InitR(INITR_REDTAB);
+	//ST7735_InitR(INITR_REDTAB);
 #endif
   Running    = 0;        // Log not running
   DataLost   = 0;        // lost data between producer and consumer
@@ -567,8 +608,9 @@ int main(void){
   Idlecount  = 0;
   count1=0;
   NumCreated = 0;
+#if SDDEBUG
 	OS_AddPeriodicThread(&disk_timerproc,10*TIME_1MS,0);   // time out routines for disk
-
+#endif
 #ifdef EMITTER
   OS_AddPeriodicThread(&emit_half_bit,TIME_1S/SYMBOLRATE,3);
 	NumCreated += OS_AddThread(&Interpreter,128,4);
@@ -597,9 +639,10 @@ int main(void){
   //NumCreated += OS_AddThread(&thread1,128,5);
   //NumCreated += OS_AddThread(&bufferReader,128,4);
 	// Final Thread
-	#ifdef RECEIVER
+#ifdef RECEIVER
 #if !BUFFERINPUT
-	ADC_Collect(7,SYMBOLRATE*oversampling,&producerTaskFifo); //Symboltime== Based on system Clock 80000
+	NumCreated += OS_AddThread(&startSampling,128,2);
+	//ADC_Collect(RECINPUT,SYMBOLRATE*oversampling,&producerTaskFifo); //Symboltime== Based on system Clock 80000
 #endif
 #endif
   OS_Launch(TIME_SLICE); // doesn't return, interrupts enabled in here
