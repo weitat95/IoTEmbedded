@@ -83,7 +83,7 @@ int insert_edge( long  * manchester_word, char edge, int edge_period, int * time
    int sync_word_detect = 0 ;
    if( ((*manchester_word) & 0x01) != edge ){ //make sure we don't have same edge ...
 //		 printf("EDGE:%d",edge);
-             if(edge_period > (oversamplingR+1)){
+             if(edge_period > (oversamplingR)){
                 unsigned char last_bit = (*manchester_word) & 0x01 ;
                 (*manchester_word) = ((*manchester_word) << 1) | last_bit ; // signal was steady for longer than a single symbol, 
                 (*time_from_last_sync) += 1 ;
@@ -199,7 +199,7 @@ void sample_signal_edge(int readValue){
   else if((oldValue - readValue) > EDGE_THRESHOLD) edge_val = -1;
   else edge_val = 0 ;
   oldValue = readValue ;
-  if(edge_val == 0 || edge_val == old_edge_val || (edge_val != old_edge_val && steady_count < oversamplingR/2)){
+  if(edge_val == 0 || edge_val == old_edge_val || (edge_val != old_edge_val && steady_count < oversamplingR)){
     if( steady_count < (4 * oversamplingR)){
       steady_count ++ ;
     }
@@ -282,3 +282,39 @@ void initLifiReceiver(int oversamplingFactor){
 	oversamplingR=oversamplingFactor;
 }
 
+void insert( long  * manchester_word, char edge, int edge_period, int * time_from_last_sync, unsigned int * detected_word){
+	int new_word = 0 ;
+  int is_a_word_value = 0 ;
+  int sync_word_detect = 0 ;
+	if(edge < 0){
+		(*manchester_word) = ( (*manchester_word) << 1) | 0x00 ; // signal goes down
+  }else{
+    (*manchester_word) = ( (*manchester_word) << 1) | 0x01 ; // signal goes up
+  }
+	(*time_from_last_sync) += 1 ;
+	is_a_word_value = is_a_word(manchester_word, (*time_from_last_sync), detected_word);
+}
+void insertEdgeCapture(unsigned long data){
+	
+	char edge=0;
+	if(data==1){
+			edge=1;
+	}else if(data==2){
+		edge=1;
+		steady_count+=2;
+	}else if(data==3){
+		edge=-1;
+	}else if(data==4){
+		edge=-1;
+		steady_count+=2;
+	}
+	new_word = insert_edge(&shift_reg, edge, steady_count, &(dist_last_sync), &detected_word); 
+	if(dist_last_sync > (32)){ // limit dist_last_sync to avoid overflow problems
+            dist_last_sync = 32 ;
+  }
+	if(new_word==1){
+		OS_Signal(&semaWordDetected);
+		OS_Wait(&semaWordDecoded);
+	}
+	steady_count = 0 ;
+}

@@ -576,6 +576,11 @@ void OS_Sleep(unsigned long sleepTime){
   OS_Suspend();
 }
 
+void OS_SleepUs(unsigned long sleepTime){
+	RunPt->sleep=(sleepTime*TIME_1MS/1000)/NVIC_ST_RELOAD_R;
+	OS_Suspend();
+}
+
 // ******** OS_bWait ************
 // Lab2 spinlock, set to 0
 // Lab3 block if less than zero

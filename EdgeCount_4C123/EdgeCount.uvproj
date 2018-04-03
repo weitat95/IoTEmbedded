@@ -7,38 +7,38 @@
 
   <Targets>
     <Target>
-      <TargetName>pegasus</TargetName>
+      <TargetName>EdgeCount</TargetName>
       <ToolsetNumber>0x4</ToolsetNumber>
       <ToolsetName>ARM-ADS</ToolsetName>
       <pCCUsed>5060528::V5.06 update 5 (build 528)::ARMCC</pCCUsed>
       <uAC6>0</uAC6>
       <TargetOption>
         <TargetCommonOption>
-          <Device>TM4C1231C3PM</Device>
+          <Device>LM4F120H5QR</Device>
           <Vendor>Texas Instruments</Vendor>
-          <Cpu>IRAM(0x20000000-0x20002FFF) IROM(0-0x7FFF) CLOCK(16000000) CPUTYPE("Cortex-M4") FPU2</Cpu>
+          <Cpu>IRAM(0x20000000-0x20007FFF) IROM(0-0x3FFFF) CLOCK(8000000) CPUTYPE("Cortex-M4") FPU2</Cpu>
           <FlashUtilSpec></FlashUtilSpec>
-          <StartupFile>"Startup\TI\TM4C123\startup_TM4C123.s" ("TM4C123 Startup Code")</StartupFile>
-          <FlashDriverDll>UL2CM3(-O207 -S0 -C0 -FO7 -FD20000000 -FC800 -FN1 -FF0TM4C123_32 -FS00 -FL08000)</FlashDriverDll>
+          <StartupFile>"STARTUP\Luminary\Startup.s" ("Luminary Startup Code")</StartupFile>
+          <FlashDriverDll>UL2CM3(-O207 -S0 -C0 -FO7 -FD20000000 -FC800 -FN1 -FF0LM4F_256 -FS00 -FL040000)</FlashDriverDll>
           <DeviceId>5919</DeviceId>
-          <RegisterFile>TM4C123.h</RegisterFile>
+          <RegisterFile>LM4Fxxxx.H</RegisterFile>
           <MemoryEnv></MemoryEnv>
           <Cmp></Cmp>
           <Asm></Asm>
           <Linker></Linker>
           <OHString></OHString>
           <InfinionOptionDll></InfinionOptionDll>
-          <SLE66CMisc>-DTM4C1231C3PM</SLE66CMisc>
+          <SLE66CMisc></SLE66CMisc>
           <SLE66AMisc></SLE66AMisc>
           <SLE66LinkerMisc></SLE66LinkerMisc>
-          <SFDFile>SFD\TI\TM4C123\TM4C1231C3PM.SFR</SFDFile>
+          <SFDFile></SFDFile>
           <bCustSvd>0</bCustSvd>
           <UseEnv>0</UseEnv>
           <BinPath></BinPath>
           <IncludePath></IncludePath>
           <LibPath></LibPath>
-          <RegisterFilePath>TI\TM4C123\</RegisterFilePath>
-          <DBRegisterFilePath>TI\TM4C123\</DBRegisterFilePath>
+          <RegisterFilePath>Luminary\</RegisterFilePath>
+          <DBRegisterFilePath>Luminary\</DBRegisterFilePath>
           <TargetStatus>
             <Error>0</Error>
             <ExitCodeStop>0</ExitCodeStop>
@@ -46,14 +46,14 @@
             <NotGenerated>0</NotGenerated>
             <InvalidFlash>1</InvalidFlash>
           </TargetStatus>
-          <OutputDirectory>.\output\</OutputDirectory>
-          <OutputName>pegasus</OutputName>
+          <OutputDirectory>.\</OutputDirectory>
+          <OutputName>EdgeCount</OutputName>
           <CreateExecutable>1</CreateExecutable>
           <CreateLib>0</CreateLib>
           <CreateHexFile>0</CreateHexFile>
           <DebugInformation>1</DebugInformation>
           <BrowseInformation>1</BrowseInformation>
-          <ListingPath>.\list\</ListingPath>
+          <ListingPath>.\</ListingPath>
           <HexFormatSelection>1</HexFormatSelection>
           <Merge32K>0</Merge32K>
           <CreateBatchFile>0</CreateBatchFile>
@@ -110,7 +110,7 @@
           <SimDllName>SARMCM3.DLL</SimDllName>
           <SimDllArguments>-MPU</SimDllArguments>
           <SimDlgDll>DCM.DLL</SimDlgDll>
-          <SimDlgDllArguments>-pCM4 -dLaunchPadDLL</SimDlgDllArguments>
+          <SimDlgDllArguments>-pCM4</SimDlgDllArguments>
           <TargetDllName>SARMCM3.DLL</TargetDllName>
           <TargetDllArguments>-MPU</TargetDllArguments>
           <TargetDlgDll>TCM.DLL</TargetDlgDll>
@@ -173,7 +173,7 @@
             <RunIndependent>0</RunIndependent>
             <UpdateFlashBeforeDebugging>1</UpdateFlashBeforeDebugging>
             <Capability>1</Capability>
-            <DriverSelection>4103</DriverSelection>
+            <DriverSelection>4097</DriverSelection>
           </Flash1>
           <bUseTDR>1</bUseTDR>
           <Flash2>BIN\lmidk-agdi.dll</Flash2>
@@ -283,12 +283,12 @@
               <IRAM>
                 <Type>0</Type>
                 <StartAddress>0x20000000</StartAddress>
-                <Size>0x3000</Size>
+                <Size>0x8000</Size>
               </IRAM>
               <IROM>
                 <Type>1</Type>
                 <StartAddress>0x0</StartAddress>
-                <Size>0x8000</Size>
+                <Size>0x40000</Size>
               </IROM>
               <XRAM>
                 <Type>0</Type>
@@ -362,7 +362,7 @@
             <wLevel>2</wLevel>
             <uThumb>0</uThumb>
             <uSurpInc>0</uSurpInc>
-            <uC99>1</uC99>
+            <uC99>0</uC99>
             <useXO>0</useXO>
             <v6Lang>1</v6Lang>
             <v6LangP>1</v6LangP>
@@ -372,8 +372,8 @@
             <v6WtE>0</v6WtE>
             <v6Rtti>0</v6Rtti>
             <VariousControls>
-              <MiscControls>--C99</MiscControls>
-              <Define>rvmdk PART_LM4F110B2QR</Define>
+              <MiscControls>--c99</MiscControls>
+              <Define>rvmdk PART_LM4F120H5QR</Define>
               <Undefine></Undefine>
               <IncludePath>..;..\..\..</IncludePath>
             </VariousControls>
@@ -425,199 +425,19 @@
               <FilePath>.\startup.s</FilePath>
             </File>
             <File>
-              <FileName>osasm.s</FileName>
-              <FileType>2</FileType>
-              <FilePath>.\osasm.s</FilePath>
-            </File>
-            <File>
-              <FileName>uart.c</FileName>
+              <FileName>EdgeCountTestMain.c</FileName>
               <FileType>1</FileType>
-              <FilePath>.\uart.c</FilePath>
-            </File>
-            <File>
-              <FileName>os.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>.\os.c</FilePath>
-            </File>
-            <File>
-              <FileName>pll.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>.\pll.c</FilePath>
-            </File>
-            <File>
-              <FileName>adct0atrigger.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>.\adct0atrigger.c</FilePath>
-            </File>
-            <File>
-              <FileName>fifo.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>.\fifo.c</FilePath>
-            </File>
-            <File>
-              <FileName>uart_fifo.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>.\uart_fifo.c</FilePath>
-            </File>
-            <File>
-              <FileName>main.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>.\main.c</FilePath>
-            </File>
-            <File>
-              <FileName>gpio.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>.\gpio.c</FilePath>
-            </File>
-            <File>
-              <FileName>LifiEmitter.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>.\LifiEmitter.c</FilePath>
-            </File>
-            <File>
-              <FileName>LifiReceiver.h</FileName>
-              <FileType>5</FileType>
-              <FilePath>.\LifiReceiver.h</FilePath>
-            </File>
-            <File>
-              <FileName>ST7735.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>.\ST7735.c</FilePath>
-            </File>
-            <File>
-              <FileName>eDisk.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>.\eDisk.c</FilePath>
-            </File>
-            <File>
-              <FileName>LifiReceiver.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>.\LifiReceiver.c</FilePath>
-            </File>
-            <File>
-              <FileName>DAC.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>.\DAC.c</FilePath>
-            </File>
-            <File>
-              <FileName>ff.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>.\ff.c</FilePath>
-            </File>
-            <File>
-              <FileName>efile.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>.\efile.c</FilePath>
+              <FilePath>.\EdgeCountTestMain.c</FilePath>
             </File>
             <File>
               <FileName>EdgeCount.c</FileName>
               <FileType>1</FileType>
               <FilePath>.\EdgeCount.c</FilePath>
             </File>
-          </Files>
-        </Group>
-        <Group>
-          <GroupName>mp3</GroupName>
-          <Files>
             <File>
-              <FileName>mp3dec.c</FileName>
+              <FileName>PLL.c</FileName>
               <FileType>1</FileType>
-              <FilePath>.\mp3\fixpt\mp3dec.c</FilePath>
-            </File>
-            <File>
-              <FileName>mp3tabs.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>.\mp3\fixpt\mp3tabs.c</FilePath>
-            </File>
-            <File>
-              <FileName>bitstream.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>.\mp3\fixpt\real\bitstream.c</FilePath>
-            </File>
-            <File>
-              <FileName>buffers.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>.\mp3\fixpt\real\buffers.c</FilePath>
-            </File>
-            <File>
-              <FileName>trigtabs.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>.\mp3\fixpt\real\trigtabs.c</FilePath>
-            </File>
-            <File>
-              <FileName>subband.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>.\mp3\fixpt\real\subband.c</FilePath>
-            </File>
-            <File>
-              <FileName>stproc.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>.\mp3\fixpt\real\stproc.c</FilePath>
-            </File>
-            <File>
-              <FileName>scalfact.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>.\mp3\fixpt\real\scalfact.c</FilePath>
-            </File>
-            <File>
-              <FileName>dct32.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>.\mp3\fixpt\real\dct32.c</FilePath>
-            </File>
-            <File>
-              <FileName>dequant.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>.\mp3\fixpt\real\dequant.c</FilePath>
-            </File>
-            <File>
-              <FileName>dqchan.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>.\mp3\fixpt\real\dqchan.c</FilePath>
-            </File>
-            <File>
-              <FileName>huffman.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>.\mp3\fixpt\real\huffman.c</FilePath>
-            </File>
-            <File>
-              <FileName>hufftabs.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>.\mp3\fixpt\real\hufftabs.c</FilePath>
-            </File>
-            <File>
-              <FileName>imdct.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>.\mp3\fixpt\real\imdct.c</FilePath>
-            </File>
-            <File>
-              <FileName>asmmisc.s</FileName>
-              <FileType>2</FileType>
-              <FilePath>.\mp3\fixpt\real\arm\asmmisc.s</FilePath>
-            </File>
-            <File>
-              <FileName>mp3common.h</FileName>
-              <FileType>5</FileType>
-              <FilePath>.\mp3\fixpt\pub\mp3common.h</FilePath>
-            </File>
-            <File>
-              <FileName>mp3dec.h</FileName>
-              <FileType>5</FileType>
-              <FilePath>.\mp3\fixpt\pub\mp3dec.h</FilePath>
-            </File>
-            <File>
-              <FileName>mpadecobjfixpt.h</FileName>
-              <FileType>5</FileType>
-              <FilePath>.\mp3\fixpt\pub\mpadecobjfixpt.h</FilePath>
-            </File>
-            <File>
-              <FileName>statname.h</FileName>
-              <FileType>5</FileType>
-              <FilePath>.\mp3\fixpt\pub\statname.h</FilePath>
-            </File>
-            <File>
-              <FileName>asmpoly.s</FileName>
-              <FileType>2</FileType>
-              <FilePath>.\mp3\fixpt\real\arm\asmpoly.s</FilePath>
+              <FilePath>.\PLL.c</FilePath>
             </File>
           </Files>
         </Group>

@@ -62,8 +62,10 @@ to program the receiver for the LIFI please define receiver below
 //#define EMITTER
 #define RECEIVER
 #define BUFFERINPUT 1 //If wants buffer input instead of sampling
-#define AUDIOOUT 1 //Outputing audio to output (GPIO PORT TO BE DEFINED)
-#define SDDEBUG 1 //Enable SD Card Debugging 
+#define AUDIOOUT 0 //Outputing audio to output (GPIO PORT TO BE DEFINED)
+#define SDDEBUG 0 //Enable SD Card Debugging 
+
+#define EDGETIMERMODE 1 //Edge capture is used instead of using ADC sampling
 #define ARM_ADS
 
 #include <stdbool.h>
@@ -81,12 +83,12 @@ to program the receiver for the LIFI please define receiver below
 #include "inc/tm4c123gh6pm.h"
 
 #ifdef RECEIVER
-
+	#include "EdgeCount.h"
 	#include "ST7735.h"
 	#include "DAC.h"
 	#include "LifiReceiver.h"
 	#define RECINPUT 5 //Channel 5 PD2 (Channel defined in adct0atrigger.c)
-	int oversampling = 2;
+	int oversampling = 1;
 	#if BUFFERINPUT
 		#include "LifiEmitter.h"
 	#endif
@@ -225,7 +227,7 @@ void changeDataFrame1(char character){
 
 // Debugging the receiver functionality with hardcoded values in a buffer
 void consumerFromBuffer(){
-	while(1){
+	
 	inputFrameIntoOSFifo(idleFrame);
 	inputFrameIntoOSFifo(preambleFrame);
 	inputFrameIntoOSFifo(startFrame);
@@ -233,13 +235,12 @@ void consumerFromBuffer(){
 	inputFrameIntoOSFifo(dataFrame1);
 	inputFrameIntoOSFifo(dataFrame1);
 	inputFrameIntoOSFifo(endFrame);
-		OS_Sleep(1000);
-	}
 	OS_Kill();
 }
 
 #endif
 //************************************** Final Threads *****************************
+#if !EDGETIMERMODE
 void producerTaskFifo(unsigned long data){
 		if(OS_Fifo_Put(data)==0){
 			fail_counter++;
@@ -251,13 +252,72 @@ void startSampling(void){
 	ADC_Collect(RECINPUT,SYMBOLRATE*oversampling,&producerTaskFifo); //Symboltime== Based on system Clock 80000
 	OS_Kill();
 }
+#elif EDGETIMERMODE
+#define TIMETHRESH 1000
+int myedge=0;
+unsigned long mytime;
+int myi=0;
+unsigned long bufff[50];
+//Main task for edge capture on PB6
+//1 Rising Edge
+//2 Rising Edge Long
+//3 Falling Edge
+//4 Falling Edge Long
+void edgeTask(int edge,unsigned long time){
+	myedge=edge;
+	mytime=time;
+	if(myedge==1){
+		if(mytime>TIMETHRESH){
+			OS_Fifo_Put(2);
+		}else{OS_Fifo_Put(1);}
+	}else if(myedge==-1){
+		if(mytime>TIMETHRESH){
+			OS_Fifo_Put(4);
+		}else{OS_Fifo_Put(3);}
+	}
+	//To get the time threshold
+	/* 
+	if(myi>=50){myi=0;}
+	bufff[myi]=mytime;
+	myi++;
+	*/
+}
+void putFrame(const unsigned long * frame){
+	for(int i=0;i<20;i++){
+		if(frame[i]==HIGH){
+			GPIO_PORTD_DATA_R |= 0x01;
+			OS_SleepUs(20);
+		}else if(frame[i]==LOW){
+			GPIO_PORTD_DATA_R &= ~0x01;
+			OS_SleepUs(20);
+		}
+	}
+}
+//Debugging task to simulate square waves in PB6 by toggleling PD0 since they are connected by R9;
+void pulsePD0(void){
+	int n=0;
+	while(n<100){
+		putFrame(idleFrame);
+		n++;
+	}
+		putFrame(preambleFrame);
+		putFrame(startFrame);
+		putFrame(dataFrame1);
+		putFrame(dataFrame1);
+		putFrame(dataFrame1);
+		putFrame(endFrame);
+		putFrame(idleFrame);
+		OS_Kill();
+}
+
+#endif
 
 int consumerTaskCounter=0;
 void consumerTaskFifo(void){
 	while(1){
 		consumerTaskCounter++;
 		unsigned long data = OS_Fifo_Get();
-		if(k<500){
+		/*if(k<500){
 		buffer[k]=data;
 		k++;}
 		else if(k==500){	
@@ -266,10 +326,15 @@ void consumerTaskFifo(void){
 				printf("%d\n\r",buffer[i]);
 			}
 			OS_Kill();
-		}
+		}*/
+#if EDGETIMERMODE
+		insertEdgeCapture(data);
+#else
 		sample_signal_edge(data);
+#endif
 	}
 }
+
 int wordDetectedTaskCounter=0;
 void wordDetectedTask(void){
 	while(1){
@@ -435,6 +500,15 @@ void Interpreter(void) {
 		}
 #endif
 		
+#if EDGETIMERMODE
+		if(strcmp(token,"SIMULATEEDGE")==0){
+			SPACEFORMATTING
+			NumCreated += OS_AddThread(&pulsePD0,128,2);
+			continue;
+		}
+#endif
+		
+		
 #endif
 		
 		
@@ -523,6 +597,19 @@ int main(void){
 #if !BUFFERINPUT
 	NumCreated += OS_AddThread(&startSampling,128,2);
 	//ADC_Collect(RECINPUT,SYMBOLRATE*oversampling,&producerTaskFifo); //Symboltime== Based on system Clock 80000
+#endif
+#if EDGETIMERMODE
+	EdgeTimer_Init(&edgeTask);
+	//Activate Port D for simulating squarewaves to test edge capture to PB6
+	SYSCTL_RCGCGPIO_R |= 0x08; // activate Port D
+  while((SYSCTL_PRGPIO_R&0x08) == 0){};// allow time to finish activating
+  GPIO_PORTD_DIR_R |= 0x01;  // make PD0 out
+  GPIO_PORTD_AFSEL_R &= ~0x01;// disable alt funct on PD0
+  GPIO_PORTD_DEN_R |= 0x01;  // enable digital I/O on PD0
+                             // configure PD0 as GPIO
+  GPIO_PORTD_PCTL_R = (GPIO_PORTD_PCTL_R&0xFFFFFFF0)+0x00000000;
+  GPIO_PORTD_AMSEL_R &= ~0x01;// disable analog functionality on PD0
+  GPIO_PORTD_DATA_R = 0;
 #endif
 #endif
   OS_Launch(TIME_SLICE); // doesn't return, interrupts enabled in here

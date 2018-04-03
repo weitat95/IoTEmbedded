@@ -11,3 +11,4 @@ enum receiver_state {
 void sample_signal_edge(int readValue);
 void getDataFrame(void);
 void initLifiReceiver(int oversamplingFactor);
+void insertEdgeCapture(unsigned long data);
