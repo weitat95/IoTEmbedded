@@ -61,11 +61,17 @@ to program the receiver for the LIFI please define receiver below
 */
 //#define EMITTER
 #define RECEIVER
-#define BUFFERINPUT 1 //If wants buffer input instead of sampling
+#define BUFFERINPUT 0 //If wants buffer input instead of sampling
 #define AUDIOOUT 0 //Outputing audio to output (GPIO PORT TO BE DEFINED)
 #define SDDEBUG 0 //Enable SD Card Debugging 
 
 #define EDGETIMERMODE 1 //Edge capture is used instead of using ADC sampling
+#if (EDGETIMERMODE)&&(!AUDIOOUT)
+#define EDGETIMERDEBUG 1 //using PD0 to debug edge timer,
+												 //DAC is also using PD0
+												 //Cannot activate both at the same time
+#endif
+
 #define ARM_ADS
 
 #include <stdbool.h>
@@ -173,7 +179,7 @@ unsigned long fail_counter=0;
 unsigned long producer_counter=0;
 unsigned long buffer[500];
 unsigned char bufferFile[512];
-#if BUFFERINPUT
+#if (BUFFERINPUT||EDGETIMERDEBUG)
 #define HIGH 4000
 #define LOW 100
 
@@ -282,6 +288,7 @@ void edgeTask(int edge,unsigned long time){
 	myi++;
 	*/
 }
+#if EDGETIMERDEBUG
 void putFrame(const unsigned long * frame){
 	for(int i=0;i<20;i++){
 		if(frame[i]==HIGH){
@@ -309,6 +316,7 @@ void pulsePD0(void){
 		putFrame(idleFrame);
 		OS_Kill();
 }
+#endif
 
 #endif
 
@@ -501,11 +509,13 @@ void Interpreter(void) {
 #endif
 		
 #if EDGETIMERMODE
+#if EDGETIMERDEBUG
 		if(strcmp(token,"SIMULATEEDGE")==0){
 			SPACEFORMATTING
 			NumCreated += OS_AddThread(&pulsePD0,128,2);
 			continue;
 		}
+#endif
 #endif
 		
 		
@@ -594,12 +604,17 @@ int main(void){
   //NumCreated += OS_AddThread(&bufferReader,128,4);
 	// Final Thread
 #ifdef RECEIVER
+
 #if !BUFFERINPUT
+#if !EDGETIMERMODE
 	NumCreated += OS_AddThread(&startSampling,128,2);
 	//ADC_Collect(RECINPUT,SYMBOLRATE*oversampling,&producerTaskFifo); //Symboltime== Based on system Clock 80000
 #endif
+#endif
+
 #if EDGETIMERMODE
 	EdgeTimer_Init(&edgeTask);
+#if EDGETIMERDEBUG	
 	//Activate Port D for simulating squarewaves to test edge capture to PB6
 	SYSCTL_RCGCGPIO_R |= 0x08; // activate Port D
   while((SYSCTL_PRGPIO_R&0x08) == 0){};// allow time to finish activating
@@ -610,6 +625,7 @@ int main(void){
   GPIO_PORTD_PCTL_R = (GPIO_PORTD_PCTL_R&0xFFFFFFF0)+0x00000000;
   GPIO_PORTD_AMSEL_R &= ~0x01;// disable analog functionality on PD0
   GPIO_PORTD_DATA_R = 0;
+#endif
 #endif
 #endif
   OS_Launch(TIME_SLICE); // doesn't return, interrupts enabled in here

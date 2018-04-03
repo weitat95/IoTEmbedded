@@ -199,7 +199,7 @@ void sample_signal_edge(int readValue){
   else if((oldValue - readValue) > EDGE_THRESHOLD) edge_val = -1;
   else edge_val = 0 ;
   oldValue = readValue ;
-  if(edge_val == 0 || edge_val == old_edge_val || (edge_val != old_edge_val && steady_count < oversamplingR)){
+  if(edge_val == 0 || edge_val == old_edge_val || (edge_val != old_edge_val && steady_count < oversamplingR/2)){
     if( steady_count < (4 * oversamplingR)){
       steady_count ++ ;
     }
@@ -282,18 +282,7 @@ void initLifiReceiver(int oversamplingFactor){
 	oversamplingR=oversamplingFactor;
 }
 
-void insert( long  * manchester_word, char edge, int edge_period, int * time_from_last_sync, unsigned int * detected_word){
-	int new_word = 0 ;
-  int is_a_word_value = 0 ;
-  int sync_word_detect = 0 ;
-	if(edge < 0){
-		(*manchester_word) = ( (*manchester_word) << 1) | 0x00 ; // signal goes down
-  }else{
-    (*manchester_word) = ( (*manchester_word) << 1) | 0x01 ; // signal goes up
-  }
-	(*time_from_last_sync) += 1 ;
-	is_a_word_value = is_a_word(manchester_word, (*time_from_last_sync), detected_word);
-}
+
 void insertEdgeCapture(unsigned long data){
 	
 	char edge=0;
