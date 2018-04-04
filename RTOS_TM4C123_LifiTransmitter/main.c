@@ -67,7 +67,7 @@ to program the receiver for the LIFI please define receiver below
 
 #define EDGETIMERMODE 1 //Edge capture is used instead of using ADC sampling
 #if (EDGETIMERMODE)&&(!AUDIOOUT)
-#define EDGETIMERDEBUG 1 //using PD0 to debug edge timer,
+#define EDGETIMERDEBUG 0 //using PD0 to debug edge timer,
 												 //DAC is also using PD0
 												 //Cannot activate both at the same time
 #endif
@@ -177,8 +177,8 @@ void thread1(void){
 #ifdef RECEIVER
 unsigned long fail_counter=0;
 unsigned long producer_counter=0;
-unsigned long buffer[500];
-unsigned char bufferFile[512];
+static unsigned long buffer[500];
+static unsigned char bufferFile[512];
 #if (BUFFERINPUT||EDGETIMERDEBUG)
 #define HIGH 4000
 #define LOW 100
@@ -259,11 +259,16 @@ void startSampling(void){
 	OS_Kill();
 }
 #elif EDGETIMERMODE
-#define TIMETHRESH 1000
+#if EDGETIMERDEBUG
+#define TIMETHRESH 1200
+#else 
+#define TIMETHRESH (SYMBOLRATE*8/10)*2*80/100 
+#endif
+#define BUFFFSIZE 1024
 int myedge=0;
 unsigned long mytime;
 int myi=0;
-unsigned long bufff[50];
+static unsigned long bufff[BUFFFSIZE];
 //Main task for edge capture on PB6
 //1 Rising Edge
 //2 Rising Edge Long
@@ -272,21 +277,39 @@ unsigned long bufff[50];
 void edgeTask(int edge,unsigned long time){
 	myedge=edge;
 	mytime=time;
+	if(OS_Fifo_Put(edge)==0){
+		fail_counter++;
+	}else{
+		producer_counter++;
+		bufff[myi]=mytime;
+		myi++;
+		if(myi>=BUFFFSIZE){myi=0;}
+	}
+	/*
+	int success=0;
 	if(myedge==1){
 		if(mytime>TIMETHRESH){
-			OS_Fifo_Put(2);
-		}else{OS_Fifo_Put(1);}
+			success=OS_Fifo_Put(2);
+		}else{success=OS_Fifo_Put(1);}
 	}else if(myedge==-1){
 		if(mytime>TIMETHRESH){
-			OS_Fifo_Put(4);
-		}else{OS_Fifo_Put(3);}
+			success=OS_Fifo_Put(4);
+		}else{success=OS_Fifo_Put(3);}
+	}
+	if(success==0){
+		fail_counter++;
+	}else{
+		producer_counter++;
 	}
 	//To get the time threshold
-	/* 
+	
 	if(myi>=50){myi=0;}
 	bufff[myi]=mytime;
 	myi++;
-	*/
+	if(mytime>9000&&myi>=40){
+		printf("STOP");
+	}*/
+	
 }
 #if EDGETIMERDEBUG
 void putFrame(const unsigned long * frame){
@@ -319,8 +342,11 @@ void pulsePD0(void){
 #endif
 
 #endif
-
+int consumeri=0;
 int consumerTaskCounter=0;
+int consumerBigTimeCounter=0;
+
+uint16_t previousTime=0;
 void consumerTaskFifo(void){
 	while(1){
 		consumerTaskCounter++;
@@ -335,6 +361,36 @@ void consumerTaskFifo(void){
 			}
 			OS_Kill();
 		}*/
+		
+		if(data==0){ //
+			if(bufff[consumeri]>TIMETHRESH && previousTime==0){
+				data=4;
+				consumerBigTimeCounter++;
+				previousTime=1;
+			}else {
+				data=3;
+				previousTime=0;
+			}
+		}else if(data==1){
+			if(bufff[consumeri]>TIMETHRESH && previousTime==0){
+				data=2;
+				consumerBigTimeCounter++;
+				previousTime=1;
+				
+			}else {
+			data=1;
+			previousTime=0;
+			}
+		
+		}
+		if(consumeri==myi){
+			printf("ABC");
+		}
+		consumeri++;
+		if(consumeri>=BUFFFSIZE){
+			consumeri=0;
+		}
+
 #if EDGETIMERMODE
 		insertEdgeCapture(data);
 #else

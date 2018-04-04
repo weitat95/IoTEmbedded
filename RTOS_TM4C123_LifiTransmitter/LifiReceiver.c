@@ -130,6 +130,8 @@ int add_byte_to_frame(char * frame_buffer, int * frame_index, int * frame_size, 
   }
   if((*frame_state) != IDLE){ // we are synced
   frame_buffer[*frame_index] = data ;
+	printf("received_data: %#04X: %c \n\r",data,data);
+	
   (*frame_index) ++ ;
     if(data == STX){
       //Serial.println("START");
@@ -151,7 +153,7 @@ int add_byte_to_frame(char * frame_buffer, int * frame_index, int * frame_size, 
 			CLEARCOLOR
 			#endif
        return 1 ;
-    }else if(data == 0xFF){
+    }/*else if(data == 0xFF){
 			//ST7735_OutString(1,1,frame_buffer,ST7735_WHITE);
 			(*frame_size) = (*frame_index);
 			(*frame_index) = -1;
@@ -160,7 +162,7 @@ int add_byte_to_frame(char * frame_buffer, int * frame_index, int * frame_size, 
 			printf("END\n\r");
 			CLEARCOLOR
 			#endif
-		}
+		}*/
 		else if((*frame_index) >= 38){ //frame is larger than max size of frame ...
       (*frame_index) = -1 ;
       (*frame_size) = -1 ;
