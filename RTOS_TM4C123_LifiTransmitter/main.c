@@ -29,10 +29,16 @@
 //*****************************************************************************
 //***************************** Connections ***********************************
 /*
+// IF YOU ARE USING THE LAUNCHPAD VERSION, PLEASE NOTE THAT PD0 and PB6 ARE INTERNALLY CONNECTED 
+// THE DAC uses PD0 and Edge Capture uses PB6 which would cause HARD FAILURE
+// EDGE CAPTURE TIMER uses this connection to DEBUG EDGE CAPTURE in particular
+
 ******Transmitter******
 LED Input - GPIO PF2
 ******Receiver*********
 ADCSampler- GPIO PD2 
+or
+EDGECAPTURE- GPIO PB6
 ******ST7735***
 VCC 			- 3.3V
 GND 			- GND
@@ -73,12 +79,12 @@ to program the receiver for the LIFI please define receiver below
 	#define ADCSAMPLING 0
 
 	#define EDGETIMERMODE 1
-	//Edge capture is used instead of using ADC sampling
-	#if (EDGETIMERMODE)&&(!AUDIOOUT)
-		#define EDGETIMERDEBUG 0 	//using PD0 to debug edge timer,
+		//Edge capture is used instead of using ADC sampling
+		#if (EDGETIMERMODE)&&(!AUDIOOUT)
+			#define EDGETIMERDEBUG 0 	//using PD0 to debug edge timer,
 															//DAC is also using PD0
 															//Cannot activate both at the same time
-		#define AUTODETECTSPEED 1 //Auto Detect Transmitting Frequency
+			#define AUTODETECTSPEED 1 //Auto Detect Transmitting Frequency
 	#endif
 
 
@@ -707,9 +713,7 @@ int main(void){
   
   OS_Init();        // OS Initialization
   GPIO_PortF_Init();
-#ifdef RECEIVER
-	//ST7735_InitR(INITR_REDTAB);
-#endif
+
   Running    = 0;        // Log not running
   DataLost   = 0;        // lost data between producer and consumer
   NumSamples = 0;
@@ -729,6 +733,8 @@ int main(void){
 
 #ifdef RECEIVER
 	OS_Fifo_Init(2048);
+	ST7735_InitR(INITR_REDTAB);
+
 #if EDGETIMERMODE
 	oversampling=1;
 #endif
