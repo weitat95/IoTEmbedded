@@ -11,6 +11,7 @@
 #define SYNC_SYMBOL 0xD5
 #define ETX 0x03
 #define STX 0x02
+//
 #define DEBUG
 unsigned char frame_buffer [38] ; //buffer for frame
 char frame_index = -1; // index in frame
@@ -40,7 +41,8 @@ void printInManchester(int data){
 		
   }else{
     printf("1");
-  }	
+  }
+	if(i>=30){i=0;}
 	debugBuff[i]=data;
   i++;
   if((i-2)%4==0) printf(" ");
@@ -75,6 +77,7 @@ void init_frame(unsigned char * frame){
   frame[4] = STX;
   frame_index = -1 ;
   frame_size = -1 ;
+	
 }
 
 int create_frame(char * data, int data_size, unsigned char * frame){
@@ -120,6 +123,22 @@ void manToAnalogue(unsigned long int *data_manchester, unsigned long *buffer, un
 
 void initEmitter(void){
   init_frame(frame_buffer);
+}
+
+void resetEmitterState(void){
+	init_frame(frame_buffer);
+	frame_index = -1; // index in frame
+	frame_size = -1  ; // size of the frame to be sent
+	//state variables of the manchester encoder
+	bit_counter = 0 ;
+	data_word = 0 ;  //8bit data + start + stop
+	half_bit = 0 ;
+	#ifdef DEBUG
+	state=-1;
+	i=0;
+	dFrameCounter=0;
+	dataStart=0;
+	#endif
 }
 
 int write(char * data, unsigned long data_size){

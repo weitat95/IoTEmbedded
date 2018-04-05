@@ -225,6 +225,9 @@ int OS_AddPeriodicThread(void(*task)(void),
   //one++;
   //return 1;
   }
+void OS_DisablePeriodicThread(void){
+  TIMER4_CTL_R = 0x00000000;    // 1) disable TIMER4A during setup
+}
 int OS_AddPeriodicThread2(void(*task)(void), uint32_t period,uint32_t priority){
   //else if (one==1) {
     SYSCTL_RCGCTIMER_R |= 0x20;   // 0) activate TIMER5

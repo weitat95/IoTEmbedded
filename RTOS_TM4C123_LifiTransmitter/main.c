@@ -65,12 +65,17 @@ to program the receiver for the LIFI please define receiver below
 #define AUDIOOUT 0 //Outputing audio to output (GPIO PORT TO BE DEFINED)
 #define SDDEBUG 0 //Enable SD Card Debugging 
 
+#ifdef RECEIVER
 #define EDGETIMERMODE 1
 //Edge capture is used instead of using ADC sampling
 #if (EDGETIMERMODE)&&(!AUDIOOUT)
 #define EDGETIMERDEBUG 0 //using PD0 to debug edge timer,
 												 //DAC is also using PD0
 												 //Cannot activate both at the same time
+#endif
+
+#define AUTODETECTSPEED 1 //Auto Detect Transmitting Frequency
+
 #endif
 
 #define ARM_ADS
@@ -113,7 +118,7 @@ to program the receiver for the LIFI please define receiver below
 #endif
 
 
-#define DEBUG
+//#define DEBUG
 #define SYMBOLRATE 1000 //1kHz
 
 
@@ -260,7 +265,7 @@ void startSampling(void){
 	OS_Kill();
 }
 #elif EDGETIMERMODE
-#define DEFTIMETHRESH (100000)
+#define DEFTIMETHRESH (160000)*75/100 //1kHz **Changing Symbol have to change threshold as well**
 uint32_t timeThresh=DEFTIMETHRESH;
 int myedge=0;
 unsigned long mytime;
@@ -329,6 +334,8 @@ void pulsePD0(void){
 #endif
 
 int consumerTaskCounter=0;
+int bufffi=0;
+uint32_t unstableTimeCounter=0;
 int consumerBigTimeCounter=0;
 void consumerTaskFifo(void){
 	while(1){
@@ -347,6 +354,34 @@ void consumerTaskFifo(void){
 		if(data==2 || data==4){
 			consumerBigTimeCounter++;
 		}
+		//Auto Detect FrequencyChange
+		if(bufff[bufffi]>=timeThresh*100*125/2/75/100||bufff[bufffi]<=timeThresh*85*100/2/75/100){
+			unstableTimeCounter++;
+		}else{
+			unstableTimeCounter=0;
+		}
+#if AUTODETECTSPEED
+		if(unstableTimeCounter>0x2000){ //Around 5 Seconds to trigger frequency change
+			uint32_t averageVal=0;
+			uint32_t freqDetected=0;
+			//Take Average Value of thresh
+			if(bufffi<9){
+				bufffi=BUFFFSIZE;
+			}
+			for(int i=0;i<10;i++){
+			  averageVal+=bufff[bufffi-i];
+			}
+			averageVal=averageVal/10;
+			//freqDetected=(167894-averageVal*2)*19/150;
+			timeThresh=averageVal*2*75/100;
+			//timeThresh=125921-averageVal*1125/190;
+			printf("\n\rDetected Change of frequency: Changed Threshold to=%d\n\r", timeThresh);
+			unstableTimeCounter=0;
+			bufffi=0;
+		}
+#endif
+		bufffi++;
+		if(bufffi>=BUFFFSIZE){bufffi=0;}//Prevent out of bounds
 #if EDGETIMERMODE
 		insertEdgeCapture(data);
 #else
@@ -407,6 +442,7 @@ FRESULT fresult;
 
 //Global for controlling emitter transmitting frequency;
 uint8_t freqBuffPtr=0;
+static const unsigned long freqBuff[] = {1000,5000,10000,20000,50000,100000};
 
 void Interpreter(void) {
   char str[32];
@@ -542,9 +578,21 @@ void Interpreter(void) {
 			printf("timeThresh: %d\n\r",timeThresh);
 			continue;
 		}
-		if(strcmp(token, "THRESHDEFAULT")==0){
+		
+		if(strcmp(token, "THRESHSET")==0){
 			SPACEFORMATTING
-			timeThresh=100000;
+			token=strtok(NULL,"-");
+			if(strcmp(token, "1000")==0){
+				timeThresh=100000;
+				printf("Frequency: 1kHz,Thres: %d",timeThresh);
+			}
+			else if(strcmp(token,"10000")==0){
+				timeThresh=10000;
+				printf("Frequency: 10kHz,Thres: %d",timeThresh);
+			}else if(strcmp(token,"20000")==0){
+				timeThresh=6000;
+				printf("Frequency: 20kHz,Thres: %d",timeThresh);
+			}
 			printf("timeThresh: %d\n\r",timeThresh);
 			continue;
 		}
@@ -587,10 +635,13 @@ void emit_half_bit(void);
       NumCreated += OS_AddThread(&sendPeriodicDataTask,128,4);
 			continue;
     }
-static const unsigned long freqBuff[] = {1000,5000,10000,20000,50000,100000};
 	if(strcmp(token,"CHANGEFREQ")==0){
 			SPACEFORMATTING
+			OS_StartCritical();
+			OS_DisablePeriodicThread();
+			resetEmitterState();
 			OS_AddPeriodicThread(&emit_half_bit,TIME_1S/freqBuff[freqBuffPtr],3);
+			OS_EndCritical();
 			printf("Transmitting Frequency: %d\n\r",freqBuff[freqBuffPtr]);
 			freqBuffPtr++;
 			if(freqBuffPtr>=6){

@@ -306,4 +306,7 @@ void OS_StartCritical(void);
 
 void OS_EndCritical(void);
 
+void OS_DisablePeriodicThread(void);
+
+
 #endif
