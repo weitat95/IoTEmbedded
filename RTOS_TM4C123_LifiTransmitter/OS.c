@@ -206,49 +206,45 @@ int OS_AddPeriodicThread(void(*task)(void),
                            uint32_t period, uint32_t priority){
   counter_os=0;
   counter2_os=0;
-  if (one==0){
+  //if (one==0){
   SYSCTL_RCGCTIMER_R |= 0x10;   // 0) activate TIMER4
   PeriodicTask = task;          // user function
-  TIMER4_CTL_R = 0x00000000;    // 1) disable TIMER1A during setup
+  TIMER4_CTL_R = 0x00000000;    // 1) disable TIMER4A during setup
   TIMER4_CFG_R = 0x00000000;    // 2) configure for 32-bit mode
   TIMER4_TAMR_R = 0x00000002;   // 3) configure for periodic mode, default down-count settings
   TIMER4_TAILR_R = period-1;    // 4) reload value
   period1=period;
   TIMER4_TAPR_R = 0;            // 5) bus clock resolution
-  TIMER4_ICR_R = 0x00000001;    // 6) clear TIMER1A timeout flag
+  TIMER4_ICR_R = 0x00000001;    // 6) clear TIMER4A timeout flag
   TIMER4_IMR_R = 0x00000001;    // 7) arm timeout interrupt
   NVIC_PRI17_R = (NVIC_PRI17_R&0xFF00FFFF)+(priority<<21); // 8) priority set 
 // interrupts enabled in the main program after all devices initialized
 // vector number 70
   NVIC_EN2_R = 1<<6;           // 9) enable IRQ 70-64 in NVIC
   TIMER4_CTL_R = 0x00000001;    // 10) enable TIMER4A
-  one++;
-  return 1;
+  //one++;
+  //return 1;
   }
-  
-  else if (one==1) {
+int OS_AddPeriodicThread2(void(*task)(void), uint32_t period,uint32_t priority){
+  //else if (one==1) {
     SYSCTL_RCGCTIMER_R |= 0x20;   // 0) activate TIMER5
     PeriodicTask2 = task;          // user function
-    TIMER5_CTL_R = 0x00000000;    // 1) disable TIMER1A during setup
+    TIMER5_CTL_R = 0x00000000;    // 1) disable TIMER5A during setup
     TIMER5_CFG_R = 0x00000000;    // 2) configure for 32-bit mode
     TIMER5_TAMR_R = 0x00000002;   // 3) configure for periodic mode, default down-count settings
     TIMER5_TAILR_R = period-1;    // 4) reload value
     period2=period;
     TIMER5_TAPR_R = 0;            // 5) bus clock resolution
-    TIMER5_ICR_R = 0x00000001;    // 6) clear TIMER1A timeout flag
+    TIMER5_ICR_R = 0x00000001;    // 6) clear TIMER5A timeout flag
     TIMER5_IMR_R = 0x00000001;    // 7) arm timeout interrupt
     NVIC_PRI17_R = (NVIC_PRI23_R&0xFFFFFF00)+(priority<<5); // 8) priority set 
   // interrupts enabled in the main program after all devices initialized
   // vector number 92
     NVIC_EN2_R = 1<<28;           // 9) enable IRQ 70-64 in NVIC
     TIMER5_CTL_R = 0x00000001;    // 10) enable TIMER4A
-    one++;
-    return 1;
-  }
+    //one++;
+    //return 1;
   
-  else {
-    return 0;
-  }
 }
 // ***************** OS_ClearPeriodicTime ****************
 // Reset 32-bit global Counter to zero;(needs to be used with OS_AddPeriodicThread) 

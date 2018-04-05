@@ -264,7 +264,7 @@ void getDataFrame(void){
 			}
 			received_data = received_data & 0xFF ;
 #ifdef DEBUG
-      //printf("received_data: %#04X: %c\n\r",received_data & 0xFF,received_data);
+      printf("received_data: %#04X: %c\n\r",received_data & 0xFF,received_data);
 #endif
     new_word = 0 ;
     if((byte_added = add_byte_to_frame(frameRec_buffer, &frameRec_index, &frameRec_size, &frame_state,received_data)) > 0){
@@ -282,10 +282,26 @@ void initLifiReceiver(int oversamplingFactor){
 	oversamplingR=oversamplingFactor;
 }
 
-
+uint32_t prevLongEdge=0;
 void insertEdgeCapture(unsigned long data){
 	
 	char edge=0;
+	if(data==2){
+		edge=1;
+		steady_count+=2;
+	}else if(data==1){
+		edge=1;
+	}
+	else if(data==4 ){
+		edge=-1;
+		steady_count+=2;
+	}else if(data==3){
+		edge=-1;
+	}
+		
+	
+	/*
+	
 	if(data==1){
 			edge=1;
 	}else if(data==2){
@@ -296,7 +312,12 @@ void insertEdgeCapture(unsigned long data){
 	}else if(data==4){
 		edge=-1;
 		steady_count+=2;
-	}
+	}*/
+	if(data==2||data==4){
+		prevLongEdge=1;
+	}else{ prevLongEdge=0;}
+	
+	
 	new_word = insert_edge(&shift_reg, edge, steady_count, &(dist_last_sync), &detected_word); 
 	if(dist_last_sync > (32)){ // limit dist_last_sync to avoid overflow problems
             dist_last_sync = 32 ;

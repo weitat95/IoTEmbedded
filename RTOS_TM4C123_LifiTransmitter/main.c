@@ -65,9 +65,10 @@ to program the receiver for the LIFI please define receiver below
 #define AUDIOOUT 0 //Outputing audio to output (GPIO PORT TO BE DEFINED)
 #define SDDEBUG 0 //Enable SD Card Debugging 
 
-#define EDGETIMERMODE 1 //Edge capture is used instead of using ADC sampling
+#define EDGETIMERMODE 1
+//Edge capture is used instead of using ADC sampling
 #if (EDGETIMERMODE)&&(!AUDIOOUT)
-#define EDGETIMERDEBUG 1 //using PD0 to debug edge timer,
+#define EDGETIMERDEBUG 0 //using PD0 to debug edge timer,
 												 //DAC is also using PD0
 												 //Cannot activate both at the same time
 #endif
@@ -112,8 +113,8 @@ to program the receiver for the LIFI please define receiver below
 #endif
 
 
-//#define DEBUG
-#define SYMBOLRATE 10000 //1kHz
+#define DEBUG
+#define SYMBOLRATE 1000 //1kHz
 
 
 #define TIME_SLICE (2*TIME_1MS)
@@ -182,7 +183,7 @@ unsigned char bufferFile[512];
 #if (BUFFERINPUT||EDGETIMERDEBUG)
 #define HIGH 4000
 #define LOW 100
-
+static const unsigned long sleepFrame[] = {HIGH,HIGH, HIGH,HIGH,HIGH, HIGH,HIGH,HIGH, HIGH,HIGH,HIGH, HIGH,HIGH,HIGH, HIGH,HIGH}; //
 static const unsigned long idleFrame[] = {HIGH,LOW, HIGH,LOW,LOW,HIGH, HIGH,LOW,LOW,HIGH, HIGH,LOW,LOW,HIGH, HIGH,LOW,LOW,HIGH, LOW,HIGH}; //0xAA IDLE
 static const unsigned long preambleFrame[] = {HIGH,LOW, LOW,HIGH,HIGH,LOW, LOW,HIGH,HIGH,LOW, LOW,HIGH,HIGH,LOW, LOW,HIGH,LOW,HIGH, LOW,HIGH}; //0xD5 SYNC
 static const unsigned long startFrame[] = {HIGH,LOW, HIGH,LOW,LOW,HIGH, HIGH,LOW,HIGH,LOW, HIGH,LOW,HIGH,LOW, HIGH,LOW,HIGH,LOW, LOW,HIGH}; //0x02 STX
@@ -259,11 +260,13 @@ void startSampling(void){
 	OS_Kill();
 }
 #elif EDGETIMERMODE
-#define TIMETHRESH 1000
+#define DEFTIMETHRESH (100000)
+uint32_t timeThresh=DEFTIMETHRESH;
 int myedge=0;
 unsigned long mytime;
 int myi=0;
-unsigned long bufff[50];
+#define BUFFFSIZE 1024
+unsigned long bufff[BUFFFSIZE];
 //Main task for edge capture on PB6
 //1 Rising Edge
 //2 Rising Edge Long
@@ -273,20 +276,20 @@ void edgeTask(int edge,unsigned long time){
 	myedge=edge;
 	mytime=time;
 	if(myedge==1){
-		if(mytime>TIMETHRESH){
+		if(mytime>timeThresh){
 			OS_Fifo_Put(2);
 		}else{OS_Fifo_Put(1);}
 	}else if(myedge==-1){
-		if(mytime>TIMETHRESH){
+		if(mytime>timeThresh){
 			OS_Fifo_Put(4);
 		}else{OS_Fifo_Put(3);}
 	}
 	//To get the time threshold
-	/* 
-	if(myi>=50){myi=0;}
+	 
+	if(myi>=BUFFFSIZE){myi=0;}
 	bufff[myi]=mytime;
 	myi++;
-	*/
+	
 }
 #if EDGETIMERDEBUG
 void putFrame(const unsigned long * frame){
@@ -304,6 +307,11 @@ void putFrame(const unsigned long * frame){
 void pulsePD0(void){
 	int n=0;
 	while(n<100){
+		putFrame(sleepFrame);
+		n++;
+	}
+	n=0;
+	while(n<3){
 		putFrame(idleFrame);
 		n++;
 	}
@@ -321,6 +329,7 @@ void pulsePD0(void){
 #endif
 
 int consumerTaskCounter=0;
+int consumerBigTimeCounter=0;
 void consumerTaskFifo(void){
 	while(1){
 		consumerTaskCounter++;
@@ -335,6 +344,9 @@ void consumerTaskFifo(void){
 			}
 			OS_Kill();
 		}*/
+		if(data==2 || data==4){
+			consumerBigTimeCounter++;
+		}
 #if EDGETIMERMODE
 		insertEdgeCapture(data);
 #else
@@ -392,6 +404,9 @@ unsigned long bufferInput[100];
 static FATFS g_sFatFs;
 FIL Handle,Handle2;
 FRESULT fresult;
+
+//Global for controlling emitter transmitting frequency;
+uint8_t freqBuffPtr=0;
 
 void Interpreter(void) {
   char str[32];
@@ -509,6 +524,30 @@ void Interpreter(void) {
 #endif
 		
 #if EDGETIMERMODE
+		if(strcmp(token, "THRESHUP")==0){
+			SPACEFORMATTING
+			timeThresh+=timeThresh*10/100;
+			printf("timeThresh: %d\n\r",timeThresh);
+			continue;
+		}
+		if(strcmp(token, "THRESHDOWN")==0){
+			SPACEFORMATTING
+			timeThresh-=timeThresh*10/100;
+			printf("timeThresh: %d\n\r",timeThresh);
+			continue;
+		}
+		if(strcmp(token, "THRESHDEBUG")==0){
+			SPACEFORMATTING
+			timeThresh=1000;
+			printf("timeThresh: %d\n\r",timeThresh);
+			continue;
+		}
+		if(strcmp(token, "THRESHDEFAULT")==0){
+			SPACEFORMATTING
+			timeThresh=100000;
+			printf("timeThresh: %d\n\r",timeThresh);
+			continue;
+		}
 #if EDGETIMERDEBUG
 		if(strcmp(token,"SIMULATEEDGE")==0){
 			SPACEFORMATTING
@@ -523,6 +562,7 @@ void Interpreter(void) {
 		
 		
 //**************************************** TRANSMITTER ************************************
+void emit_half_bit(void);
 
 #ifdef EMITTER
     if(strcmp(token,"SEND")==0){
@@ -537,13 +577,27 @@ void Interpreter(void) {
       OS_EndCritical();
       if(ret==0)  UART_OutString("Data sent");
       else UART_OutString("Data not sent");
+			continue;
     }
     if(strcmp(token,"SENDCONT")==0){ 
+			SPACEFORMATTING
       token=strtok(NULL,"-");
       strcpy(comBuffer,token);
       SPACEFORMATTING
       NumCreated += OS_AddThread(&sendPeriodicDataTask,128,4);
+			continue;
     }
+static const unsigned long freqBuff[] = {1000,5000,10000,20000,50000,100000};
+	if(strcmp(token,"CHANGEFREQ")==0){
+			SPACEFORMATTING
+			OS_AddPeriodicThread(&emit_half_bit,TIME_1S/freqBuff[freqBuffPtr],3);
+			printf("Transmitting Frequency: %d\n\r",freqBuff[freqBuffPtr]);
+			freqBuffPtr++;
+			if(freqBuffPtr>=6){
+				freqBuffPtr=0;
+			}
+			continue;
+		}
 #endif
 
     UART_OutChar(CR);
@@ -551,7 +605,6 @@ void Interpreter(void) {
   }
 }
 
-void emit_half_bit(void);
 
 void SW1Push1(void){
   

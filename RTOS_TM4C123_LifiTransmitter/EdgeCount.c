@@ -99,7 +99,7 @@ void EdgeTimer_Init(void(*task)(int,unsigned long)){
 	TIMER0_TAPR_R = 0xFF;				//prescale of 256. maximum value=209.7152ms
 	TIMER0_IMR_R = 0x00000004;    // 7) arm timeout interrupt for event trigger 
 	TIMER0_TAILR_R = 0xFFFF;
-	NVIC_PRI4_R = (NVIC_PRI4_R&0x00FFFFFF)|0x80000000; // 8) priority 4
+	NVIC_PRI4_R = (NVIC_PRI4_R&0x00FFFFFF)|0x00000000; // 8) priority 4
 	NVIC_EN0_R = 1<<19;           // 9) enable IRQ 19 in NVIC
 	EdgeTask=task;
 	TIMER0_ICR_R = 0x00000004;// acknowledge timer0A timeout
