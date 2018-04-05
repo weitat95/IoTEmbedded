@@ -1,6 +1,12 @@
 /*
 *  main.c
-*
+*  This main file is used for my BEng Honours 4th Year Project in The University of Edinburgh
+*  - Demonstration of Visible Light Communication -
+*  This project builts on a previously developed RTOS in of my classes in University of Texas, At Austin
+*  
+*  Author: Wei Tat Lee
+*  Thesis Supervisor: Dr. Jonathan Terry
+*  ----------------------------------------------------------------------------
 *  The file used for the class EE445M -
 *  EMBEDDED AND REAL-TIME SYSTEMS. EE445M - Spring 2017 - University of Texas
 *  at Austin. It runs on LM4F120/TM4C123.
@@ -14,10 +20,6 @@
 *  THE AUTHOR(S) SHALL NOT, IN ANY CIRCUMSTANCES, BE LIABLE FOR SPECIAL,
 *  INCIDENTAL, OR CONSEQUENTIAL DAMAGES, FOR ANY REASON WHATSOEVER.
 *  ----------------------------------------------------------------------------
-*  SOFTWARE UPDATES:
-*
-*      NAME            DATE/TIME              COMMENTS
-*  PEGASUS TEAM        April, 10 2017         Initial Version
 *
 *  NOTES:
 *  - Professor Spring 2017 class: Prof. Jonathan W. Valvano
@@ -40,7 +42,7 @@ A0(DATA)	- PA6
 SDA(MOSI)	- PA5
 SCK				-PA2
 LED				-3.3V
-*******SDCARD***
+*******SDCARD**********
 SDCS      - PB0
 SDMOSI		- PA5
 SDMISO		- PA4
@@ -61,24 +63,46 @@ to program the receiver for the LIFI please define receiver below
 */
 //#define EMITTER
 #define RECEIVER
-#define BUFFERINPUT 0 //If wants buffer input instead of sampling
-#define AUDIOOUT 0 //Outputing audio to output (GPIO PORT TO BE DEFINED)
-#define SDDEBUG 0 //Enable SD Card Debugging 
+
+//************************ CORE FEATURES *************************************
+// Only 2 type of options for the Receiver 
+// (1) ADC Sampling - PD2 (Configured Below)
+// (2) Edge Input Capture Timer - PB6             **A more stable version**
 
 #ifdef RECEIVER
-#define EDGETIMERMODE 1
-//Edge capture is used instead of using ADC sampling
-#if (EDGETIMERMODE)&&(!AUDIOOUT)
-#define EDGETIMERDEBUG 0 //using PD0 to debug edge timer,
-												 //DAC is also using PD0
-												 //Cannot activate both at the same time
+	#define ADCSAMPLING 0
+
+	#define EDGETIMERMODE 1
+	//Edge capture is used instead of using ADC sampling
+	#if (EDGETIMERMODE)&&(!AUDIOOUT)
+		#define EDGETIMERDEBUG 0 	//using PD0 to debug edge timer,
+															//DAC is also using PD0
+															//Cannot activate both at the same time
+		#define AUTODETECTSPEED 1 //Auto Detect Transmitting Frequency
+	#endif
+
+
+	// Debugging option to test ADC Sampling
+	#define BUFFERINPUT 0 //If wants buffer input instead of sampling
+
+	#if ADCSAMPLING
+
+		#define EDGETIMERMODE 0
+		#define BUFFERINPUT 0
+
+	#endif
+
+#endif
+//************************ EXTRA FEATURES ************************************
+
+#define AUDIOOUT 0 //Outputing audio to output (GPIO PORT TO BE DEFINED)
+#define SDCARD 0
+
+#if SDCARD 
+#define SDDEBUG 1 //Enable SD Card Debugging 
 #endif
 
-#define AUTODETECTSPEED 1 //Auto Detect Transmitting Frequency
-
-#endif
-
-#define ARM_ADS
+#define ARM_ADS //Used for HELIX mp3 Decoder 
 
 #include <stdbool.h>
 #include <stdio.h>
@@ -100,7 +124,7 @@ to program the receiver for the LIFI please define receiver below
 	#include "DAC.h"
 	#include "LifiReceiver.h"
 	#define RECINPUT 5 //Channel 5 PD2 (Channel defined in adct0atrigger.c)
-	int oversampling = 1;
+	int oversampling = 1; //Oversampling factor used for ADC Sampling
 	#if BUFFERINPUT
 		#include "LifiEmitter.h"
 	#endif
@@ -119,7 +143,7 @@ to program the receiver for the LIFI please define receiver below
 
 
 //#define DEBUG
-#define SYMBOLRATE 1000 //1kHz
+#define SYMBOLRATE 1000 //1kHz //Default Symbol Rate used for transmitter and (ADC SAMPLING ONLY) RECEIVER
 
 
 #define TIME_SLICE (2*TIME_1MS)
@@ -138,7 +162,7 @@ uint32_t NumCreated;   // number of foreground threads created
 uint32_t NumSamples;   // incremented every sample
 uint32_t DataLost;     // data sent by Producer, but not received by Consumer
 uint32_t Idlecount;
-uint8_t  Running;                // true while OS is running
+uint8_t  Running;      // true while OS is running
 uint32_t count1;
 
 //Color Coding for Launchpad LED
@@ -151,6 +175,8 @@ uint32_t count1;
 #define CYAN PF1=0; PF2=0x04; PF3=0x08;
 
 #define SPACEFORMATTING UART_OutChar(CR); UART_OutChar(LF);
+//********** diskError ********************
+// Used for SD Card File System Debugging
 char str[50];
 void diskError(char* errtype, unsigned long n){
   UART_OutString(errtype);
@@ -158,7 +184,6 @@ void diskError(char* errtype, unsigned long n){
   UART_OutString(str);
   OS_Kill();
 }
-
 //******** IdleTask  ***************
 // foreground thread, runs when no other work needed
 // never blocks, never sleeps, never dies
@@ -173,19 +198,20 @@ void IdleTask(void){
     //WaitForInterrupt();
   }
 }
-void thread1(void){
-  
-  while(TRUE){
-    
-    count1++;
-  }
-}
+
+
+//*************************************************************************************
+//*************************************************************************************
+//*****************************RECEIVER************************************************
+//*************************************************************************************
+//*************************************************************************************
 #ifdef RECEIVER
 unsigned long fail_counter=0;
 unsigned long producer_counter=0;
 unsigned long buffer[500];
 unsigned char bufferFile[512];
 #if (BUFFERINPUT||EDGETIMERDEBUG)
+
 #define HIGH 4000
 #define LOW 100
 static const unsigned long sleepFrame[] = {HIGH,HIGH, HIGH,HIGH,HIGH, HIGH,HIGH,HIGH, HIGH,HIGH,HIGH, HIGH,HIGH,HIGH, HIGH,HIGH}; //
@@ -252,6 +278,8 @@ void consumerFromBuffer(){
 
 #endif
 //************************************** Final Threads *****************************
+
+// ****************************************ADC Threads *****************************
 #if !EDGETIMERMODE
 void producerTaskFifo(unsigned long data){
 		if(OS_Fifo_Put(data)==0){
@@ -264,7 +292,9 @@ void startSampling(void){
 	ADC_Collect(RECINPUT,SYMBOLRATE*oversampling,&producerTaskFifo); //Symboltime== Based on system Clock 80000
 	OS_Kill();
 }
+// ***************************************END ADC THREADS***************************
 #elif EDGETIMERMODE
+//****************************************EDGE CAPTURE THREADS**********************
 #define DEFTIMETHRESH (160000)*75/100 //1kHz **Changing Symbol have to change threshold as well**
 uint32_t timeThresh=DEFTIMETHRESH;
 int myedge=0;
@@ -278,23 +308,29 @@ unsigned long bufff[BUFFFSIZE];
 //3 Falling Edge
 //4 Falling Edge Long
 void edgeTask(int edge,unsigned long time){
+	uint8_t state;
 	myedge=edge;
 	mytime=time;
 	if(myedge==1){
 		if(mytime>timeThresh){
-			OS_Fifo_Put(2);
-		}else{OS_Fifo_Put(1);}
+			state=OS_Fifo_Put(2);
+		}else{state=OS_Fifo_Put(1);}
 	}else if(myedge==-1){
 		if(mytime>timeThresh){
-			OS_Fifo_Put(4);
-		}else{OS_Fifo_Put(3);}
+			state=OS_Fifo_Put(4);
+		}else{state=OS_Fifo_Put(3);}
 	}
-	//To get the time threshold
-	 
+	if(state==0){
+		fail_counter++;
+	}else{
+		producer_counter++;
+	}
+	
+//To get the time threshold
+
 	if(myi>=BUFFFSIZE){myi=0;}
 	bufff[myi]=mytime;
 	myi++;
-	
 }
 #if EDGETIMERDEBUG
 void putFrame(const unsigned long * frame){
@@ -308,7 +344,7 @@ void putFrame(const unsigned long * frame){
 		}
 	}
 }
-//Debugging task to simulate square waves in PB6 by toggleling PD0 since they are connected by R9;
+//Debugging task to simulate square waves in PB6 by toggling PD0 since they are connected by R9;
 void pulsePD0(void){
 	int n=0;
 	while(n<100){
@@ -332,25 +368,19 @@ void pulsePD0(void){
 #endif
 
 #endif
-
+//*********************** END EDGE CAPTURE THREADS ********************
 int consumerTaskCounter=0;
 int bufffi=0;
 uint32_t unstableTimeCounter=0;
 int consumerBigTimeCounter=0;
+
+//************ Core Threads for Receiver *****************************
 void consumerTaskFifo(void){
 	while(1){
 		consumerTaskCounter++;
 		unsigned long data = OS_Fifo_Get();
-		/*if(k<500){
-		buffer[k]=data;
-		k++;}
-		else if(k==500){	
-			for(int i=0;i<500;i++){
-				
-				printf("%d\n\r",buffer[i]);
-			}
-			OS_Kill();
-		}*/
+//********************** EDGE CAPTURE******************************
+#if EDGETIMERMODE
 		if(data==2 || data==4){
 			consumerBigTimeCounter++;
 		}
@@ -361,7 +391,7 @@ void consumerTaskFifo(void){
 			unstableTimeCounter=0;
 		}
 #if AUTODETECTSPEED
-		if(unstableTimeCounter>0x2000){ //Around 5 Seconds to trigger frequency change
+		if(unstableTimeCounter>0x2000){ //Around 1~2 Seconds to trigger frequency change
 			uint32_t averageVal=0;
 			uint32_t freqDetected=0;
 			//Take Average Value of thresh
@@ -374,7 +404,7 @@ void consumerTaskFifo(void){
 			averageVal=averageVal/10;
 			//freqDetected=(167894-averageVal*2)*19/150;
 			timeThresh=averageVal*2*75/100;
-			//timeThresh=125921-averageVal*1125/190;
+
 			printf("\n\rDetected Change of frequency: Changed Threshold to=%d\n\r", timeThresh);
 			unstableTimeCounter=0;
 			bufffi=0;
@@ -382,14 +412,16 @@ void consumerTaskFifo(void){
 #endif
 		bufffi++;
 		if(bufffi>=BUFFFSIZE){bufffi=0;}//Prevent out of bounds
-#if EDGETIMERMODE
+
 		insertEdgeCapture(data);
 #else
+//********************** END EDGE CAPTURE ******************************
+//********************** ADC SAMPLING     ******************************
 		sample_signal_edge(data);
+//********************** END ADC SAMPLING ******************************
 #endif
 	}
 }
-
 int wordDetectedTaskCounter=0;
 void wordDetectedTask(void){
 	while(1){
@@ -397,6 +429,8 @@ void wordDetectedTask(void){
 		getDataFrame();
 	}
 }
+
+//************ END Core Threads for Receiver ***************************
 #if AUDIOOUT
 static HMP3Decoder hMP3Decoder;
 
@@ -407,6 +441,12 @@ void audioOutThread(void){
 #endif
 
 #endif
+//*************************************************************************************
+//*************************************************************************************
+//*****************************EMITTER*************************************************
+//*************************************************************************************
+//*************************************************************************************
+
 
 #ifdef EMITTER
 
@@ -432,6 +472,8 @@ void sendPeriodicDataTask(void){
   OS_Kill();
 }
 #endif
+
+//************************************** OTHER THREADS ***************************
 char string[32];
 unsigned long bufferInput[100];
 
@@ -442,8 +484,8 @@ FRESULT fresult;
 
 //Global for controlling emitter transmitting frequency;
 uint8_t freqBuffPtr=0;
-static const unsigned long freqBuff[] = {1000,5000,10000,20000,50000,100000};
-
+static const unsigned long freqBuff[] = {1000,5000,10000,20000,50000};
+//************************************** INTERPRETOR (UART) ***********************
 void Interpreter(void) {
   char str[32];
   char *token;
@@ -491,10 +533,10 @@ void Interpreter(void) {
 			UART_OutString("Done ReadTest Task\n\r");
 			token=strtok(NULL,"-");
 			ST7735_OutString(0,0,token,ST7735_WHITE);
-
 			continue;
 		}
 #endif
+//************************** AUDIO OUT (DAC)**************************************
 #if AUDIOOUT
 			if(strcmp(token,"AUDIOTEST")==0){
 				SPACEFORMATTING
@@ -644,7 +686,7 @@ void emit_half_bit(void);
 			OS_EndCritical();
 			printf("Transmitting Frequency: %d\n\r",freqBuff[freqBuffPtr]);
 			freqBuffPtr++;
-			if(freqBuffPtr>=6){
+			if(freqBuffPtr>=5){
 				freqBuffPtr=0;
 			}
 			continue;
@@ -657,10 +699,8 @@ void emit_half_bit(void);
 }
 
 
-void SW1Push1(void){
+//*******************************************END Interpretor ****************************
   
-}
-
 //******************************************* MAIN FUNCTION ******************************
 
 int main(void){
@@ -676,62 +716,53 @@ int main(void){
   Idlecount  = 0;
   count1=0;
   NumCreated = 0;
-#if SDDEBUG
-	OS_AddPeriodicThread(&disk_timerproc,10*TIME_1MS,0);   // time out routines for disk
+#if SDCARD
+	OS_AddPeriodicThread2(&disk_timerproc,10*TIME_1MS,0);   // time out routines for disk
 #endif
 #ifdef EMITTER
   OS_AddPeriodicThread(&emit_half_bit,TIME_1S/SYMBOLRATE,3);
 	NumCreated += OS_AddThread(&Interpreter,128,4);
-	//strcpy(comBuffer,"ABCD");
-	//NumCreated +=OS_AddThread(&sendPeriodicDataTask,128,4);
+	
 #endif
+	
+	
+
 #ifdef RECEIVER
 	OS_Fifo_Init(2048);
-	initLifiReceiver(oversampling);
+#if EDGETIMERMODE
+	oversampling=1;
+#endif
 
-	//Debugging Thread
-	NumCreated += OS_AddThread(&Interpreter,128,5);							//Used for debugging of ADC sampling 
-	// Core Threads
+	initLifiReceiver(oversampling);
+	NumCreated += OS_AddThread(&Interpreter,128,5);						
 	NumCreated += OS_AddThread(&consumerTaskFifo,128,4);
 	NumCreated += OS_AddThread(&wordDetectedTask,128,3);
 #if AUDIOOUT
 	NumCreated += OS_AddThread(&audioOutThread,128,5);
 #endif
+	#if ((!BUFFERINPUT)&&(!EDGETIMERMODE))
+		NumCreated += OS_AddThread(&startSampling,128,2);
+	#endif
 
-
-
+	#if EDGETIMERMODE
+		EdgeTimer_Init(&edgeTask);
+		#if EDGETIMERDEBUG	
+			//Activate Port D for simulating squarewaves to test edge capture to PB6
+			SYSCTL_RCGCGPIO_R |= 0x08; // activate Port D
+			while((SYSCTL_PRGPIO_R&0x08) == 0){};// allow time to finish activating
+			GPIO_PORTD_DIR_R |= 0x01;  // make PD0 out
+			GPIO_PORTD_AFSEL_R &= ~0x01;// disable alt funct on PD0
+			GPIO_PORTD_DEN_R |= 0x01;  // enable digital I/O on PD0
+															 // configure PD0 as GPIO
+			GPIO_PORTD_PCTL_R = (GPIO_PORTD_PCTL_R&0xFFFFFFF0)+0x00000000;
+			GPIO_PORTD_AMSEL_R &= ~0x01;// disable analog functionality on PD0
+			GPIO_PORTD_DATA_R = 0;
+		#endif
+	#endif
 #endif
-  // create initial foreground threads
-	//OS_AddSW1Task(&SW1Push1,2);
+
   NumCreated += OS_AddThread(&IdleTask,128,6);  // runs when nothing useful to do
-  //NumCreated += OS_AddThread(&thread1,128,5);
-  //NumCreated += OS_AddThread(&bufferReader,128,4);
-	// Final Thread
-#ifdef RECEIVER
 
-#if !BUFFERINPUT
-#if !EDGETIMERMODE
-	NumCreated += OS_AddThread(&startSampling,128,2);
-	//ADC_Collect(RECINPUT,SYMBOLRATE*oversampling,&producerTaskFifo); //Symboltime== Based on system Clock 80000
-#endif
-#endif
-
-#if EDGETIMERMODE
-	EdgeTimer_Init(&edgeTask);
-#if EDGETIMERDEBUG	
-	//Activate Port D for simulating squarewaves to test edge capture to PB6
-	SYSCTL_RCGCGPIO_R |= 0x08; // activate Port D
-  while((SYSCTL_PRGPIO_R&0x08) == 0){};// allow time to finish activating
-  GPIO_PORTD_DIR_R |= 0x01;  // make PD0 out
-  GPIO_PORTD_AFSEL_R &= ~0x01;// disable alt funct on PD0
-  GPIO_PORTD_DEN_R |= 0x01;  // enable digital I/O on PD0
-                             // configure PD0 as GPIO
-  GPIO_PORTD_PCTL_R = (GPIO_PORTD_PCTL_R&0xFFFFFFF0)+0x00000000;
-  GPIO_PORTD_AMSEL_R &= ~0x01;// disable analog functionality on PD0
-  GPIO_PORTD_DATA_R = 0;
-#endif
-#endif
-#endif
   OS_Launch(TIME_SLICE); // doesn't return, interrupts enabled in here
 
   return -1;             // this never executes
