@@ -767,17 +767,17 @@ void emit_half_bit(void);
 
 #ifdef EMITTER
     if(strcmp(token,"SEND")==0){
+			SPACEFORMATTING
 #ifdef DEBUG
 			resetCounter();
 #endif
       token=strtok(NULL,"-");
-      UART_OutChar(CR);
-      UART_OutChar(LF);
+
       OS_StartCritical();
       int ret=write(token,strlen(token));
       OS_EndCritical();
-      if(ret==0)  UART_OutString("Data sent");
-      else UART_OutString("Data not sent");
+      if(ret==0)  UART_OutString("Data sent\n\r");
+      else UART_OutString("Data not sent\n\r");
 			continue;
     }
     if(strcmp(token,"SENDCONT")==0){ 
