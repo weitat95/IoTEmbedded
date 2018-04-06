@@ -67,8 +67,8 @@ SSI1Tx (DIN, pin 3) connected to PD3
 To program the emitter for the LIFI please define emitter below
 to program the receiver for the LIFI please define receiver below
 */
-//#define EMITTER
-#define RECEIVER
+#define EMITTER
+//#define RECEIVER
 
 //************************ CORE FEATURES *************************************
 // Only 2 type of options for the Receiver 
@@ -102,7 +102,7 @@ to program the receiver for the LIFI please define receiver below
 //************************ EXTRA FEATURES ************************************
 
 #define AUDIOOUT 0 //Outputing audio to output (GPIO PORT TO BE DEFINED)
-#define SDCARD 0
+#define SDCARD 1
 
 #if SDCARD 
 #define SDDEBUG 1 //Enable SD Card Debugging 
@@ -214,8 +214,7 @@ void IdleTask(void){
 #ifdef RECEIVER
 unsigned long fail_counter=0;
 unsigned long producer_counter=0;
-unsigned long buffer[500];
-unsigned char bufferFile[512];
+unsigned long buffer[100];
 #if (BUFFERINPUT||EDGETIMERDEBUG)
 
 #define HIGH 4000
@@ -238,6 +237,7 @@ void producerTask(unsigned long data){
   }
 	
 }
+
 void resetProducerTask(void){
   k=0;
 }
@@ -484,10 +484,13 @@ char string[32];
 unsigned long bufferInput[100];
 
 //Globals for File Systems
+#if SDCARD
 static FATFS g_sFatFs;
 FIL Handle,Handle2;
 FRESULT fresult;
-
+FILINFO finfo;
+unsigned char bufferFile[512];
+#endif
 //Global for controlling emitter transmitting frequency;
 uint8_t freqBuffPtr=0;
 static const unsigned long freqBuff[] = {1000,5000,10000,20000,50000};
@@ -511,15 +514,19 @@ void Interpreter(void) {
 //**************************************** SD CARD DEBUGGING ***************************
 
 #if SDDEBUG
-		if(strcmp(token,"SDREAD")==0){
+		if(strcmp(token,"SDDEBUGREAD")==0){
 			int i;  UINT n;			
 			SPACEFORMATTING
 			fresult = f_mount(0, &g_sFatFs);
 			UART_OutString("Mounted FS\n\r");
 			if(fresult) diskError("f_mount",0);
+			fresult = f_stat("file5.txt",&finfo);
+			if(fresult) diskError("f_stat",0);
+			
 			// assumes there is a short text file named file5.txt
 			fresult = f_open(&Handle,"file5.txt", FA_READ);
 			if(fresult) diskError("f_open",0);
+			
 			UART_OutString("Opened file5.txt\n\r");
 			i=0;
 			UART_OutString("Start Reading..\n\r");
@@ -537,9 +544,107 @@ void Interpreter(void) {
 			if(fresult) diskError("f_unmount",0);
 			UART_OutString("Unmount Fs\n\r");
 			UART_OutString("Done ReadTest Task\n\r");
-			token=strtok(NULL,"-");
-			ST7735_OutString(0,0,token,ST7735_WHITE);
 			continue;
+		}
+		if(strcmp(token,"SDDEBUGWRITE")==0){
+			SPACEFORMATTING
+			 int i;  UINT n; char letter;
+			fresult = f_mount(0, &g_sFatFs);
+			printf("Mounted FS\n\r");
+			if(fresult) diskError("f_mount",0);
+			fresult = f_open(&Handle,"file6.txt",FA_CREATE_ALWAYS|FA_WRITE);
+			if(fresult) diskError("f_open",0);
+			printf("Opened (Created) file6.txt\n\r");
+			i=0;
+			 do{
+				if((i%10) == 9) letter = 13;
+				else if ((i%10) == 10) letter = 10;
+				else letter = (i%10)+'a';
+				fresult = f_write(&Handle,&letter,1,&n);
+				
+				if(fresult) diskError("f_write",0);
+				i++;
+			} while((n==1)&&(i<511));
+			 
+			fresult = f_close(&Handle);
+			if(fresult) diskError("f_close",0);
+			UART_OutString("File Closed\n\r");
+			fresult = f_mount(0,0); //Unmount
+			if(fresult) diskError("f_unmount",0);
+			UART_OutString("Unmount Fs\n\r");
+			UART_OutString("Done ReadTest Task\n\r");
+			
+			continue;
+		}
+		
+		if(strcmp(token,"SDFILESTAT")==0){
+			SPACEFORMATTING
+			token=strtok(NULL,"-");
+			fresult = f_mount(0, &g_sFatFs);
+			printf("Mounted FS\n\r");
+			if(fresult) diskError("f_mount",0);
+			fresult = f_stat(token,&finfo);
+			if(fresult) diskError("f_stat",0);
+			printf("FileName:%s, FileSize: %d Bytes\n\r",finfo.fname,finfo.fsize);
+			fresult = f_mount(0,0); //Unmount
+			if(fresult) diskError("f_unmount",0);
+			printf("Un-mounted FS\n\r");
+			continue;
+		}
+		if(strcmp(token,"SDFILEREADTOWRITE")==0){
+			SPACEFORMATTING
+			char fileName[]="male.mp3";
+			char file2Name[]="copy.mp3";
+			int i;  UINT n; char letter; int fileSize;
+			fresult = f_mount(0, &g_sFatFs);
+			printf("Mounted FS\n\r");
+			if(fresult) diskError("f_mount",0);
+			fresult = f_open(&Handle2,fileName,FA_READ);
+			if(fresult) diskError("f_open",0);
+			printf("Opened %s\n\r",fileName);
+			fresult = f_stat(fileName,&finfo);
+			fileSize=finfo.fsize;
+			if(fresult) diskError("f_stat",0);
+			printf("Checked %s stats:%d Bytes\n\r",fileName,fileSize);
+			fresult = f_open(&Handle,file2Name,FA_CREATE_ALWAYS|FA_WRITE);
+			if(fresult) diskError("f_open",0);
+			printf("Opened (Created) %s\n\r",file2Name);
+			i=0;
+			
+			do{
+				if(fileSize<512){
+					fresult = f_read(&Handle2,bufferFile,fileSize,&n);
+					if(fresult) diskError("f_read",0);
+					fresult = f_write(&Handle,bufferFile,fileSize,&n);
+					if(fresult) diskError("f_write",0);
+				}else{
+					fresult = f_read(&Handle2,bufferFile,512,&n);
+					if(fresult) diskError("f_read",0);
+				
+					fresult = f_write(&Handle,bufferFile,512,&n);
+					if(fresult) diskError("f_write",0);
+				}
+				i++;
+				fileSize-=512;
+					
+			}while(fileSize>0);
+			 
+			fresult = f_close(&Handle);
+			if(fresult) diskError("f_close",0);
+			fresult = f_close(&Handle2);
+			if(fresult) diskError("f_close",0);
+			UART_OutString("File Closed\n\r");
+
+			fresult = f_stat(file2Name,&finfo);
+			fileSize=finfo.fsize;
+			if(fresult) diskError("f_stat",0);
+			printf("Checked %s stats:%d Bytes\n\r",file2Name,fileSize);
+			fresult = f_mount(0,0); //Unmount
+			if(fresult) diskError("f_unmount",0);
+			UART_OutString("Unmount Fs\n\r");
+			UART_OutString("Done FILEREADTOWRITE\n\r");
+			
+			continue;			
 		}
 #endif
 //************************** AUDIO OUT (DAC)**************************************

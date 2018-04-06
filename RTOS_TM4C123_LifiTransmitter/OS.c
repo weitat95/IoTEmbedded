@@ -205,7 +205,6 @@ uint32_t period1,period2;
 int OS_AddPeriodicThread(void(*task)(void),
                            uint32_t period, uint32_t priority){
   counter_os=0;
-  counter2_os=0;
   //if (one==0){
   SYSCTL_RCGCTIMER_R |= 0x10;   // 0) activate TIMER4
   PeriodicTask = task;          // user function
@@ -230,6 +229,8 @@ void OS_DisablePeriodicThread(void){
 }
 int OS_AddPeriodicThread2(void(*task)(void), uint32_t period,uint32_t priority){
   //else if (one==1) {
+	  counter2_os=0;
+
     SYSCTL_RCGCTIMER_R |= 0x20;   // 0) activate TIMER5
     PeriodicTask2 = task;          // user function
     TIMER5_CTL_R = 0x00000000;    // 1) disable TIMER5A during setup
@@ -323,6 +324,7 @@ void Timer4A_Handler(void){
   (*PeriodicTask)();                // execute user task
 
 //  #ifdef JITTER
+	/*
   thisTime1=OS_Time();
   if(flag1>1){
       unsigned long diff = OS_TimeDifference(LastTime1,thisTime1);
@@ -345,10 +347,17 @@ void Timer4A_Handler(void){
   LastTime1=thisTime1;
   flag1++;
 //  #endif
+*/
   counter_os++;
   
   //PF2=0;
 }
+void Timer5A_Handler(void){
+	TIMER5_ICR_R = 0x00000001;
+	(*PeriodicTask2)();
+	counter2_os++;
+}
+
 
 
 tcbType * FirstValid;
