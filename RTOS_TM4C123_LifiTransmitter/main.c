@@ -67,8 +67,8 @@ SSI1Tx (DIN, pin 3) connected to PD3
 To program the emitter for the LIFI please define emitter below
 to program the receiver for the LIFI please define receiver below
 */
-#define EMITTER
-//#define RECEIVER
+//#define EMITTER
+#define RECEIVER
 
 //************************ CORE FEATURES *************************************
 // Only 2 type of options for the Receiver 
@@ -135,15 +135,16 @@ to program the receiver for the LIFI please define receiver below
 		#include "LifiEmitter.h"
 	#endif
 	#if AUDIOOUT
-		#include "mp3/fixpt/mp3dec.h"
-		#include "mp3/fixpt/mp3common.h"
+		#include "mp3Player.h"
 	#endif
+
 #endif
 
 
 #ifdef EMITTER
+	#include "ST7735.h"
 
-#include "LifiEmitter.h"
+	#include "LifiEmitter.h"
 
 #endif
 
@@ -437,14 +438,7 @@ void wordDetectedTask(void){
 }
 
 //************ END Core Threads for Receiver ***************************
-#if AUDIOOUT
-static HMP3Decoder hMP3Decoder;
 
-void audioOutThread(void){
-
-	OS_Kill();
-}
-#endif
 
 #endif
 //*************************************************************************************
@@ -515,6 +509,8 @@ void Interpreter(void) {
 
 #if SDDEBUG
 		if(strcmp(token,"SDDEBUGREAD")==0){
+			ST7735_OutString(0,0, "TEST", ST7735_WHITE);
+
 			int i;  UINT n;			
 			SPACEFORMATTING
 			fresult = f_mount(0, &g_sFatFs);
@@ -651,7 +647,6 @@ void Interpreter(void) {
 #if AUDIOOUT
 			if(strcmp(token,"AUDIOTEST")==0){
 				SPACEFORMATTING
-				NumCreated += OS_AddThread(&audioOutThread,128,2);
 
 				continue;
 			}
@@ -814,7 +809,7 @@ void emit_half_bit(void);
   
 //******************************************* MAIN FUNCTION ******************************
 
-int main(void){
+ int main(void){
   
   OS_Init();        // OS Initialization
   GPIO_PortF_Init();
@@ -838,7 +833,7 @@ int main(void){
 
 #ifdef RECEIVER
 	OS_Fifo_Init(2048);
-	ST7735_InitR(INITR_REDTAB);
+	//ST7735_InitR(INITR_REDTAB);
 
 #if EDGETIMERMODE
 	oversampling=1;
@@ -848,9 +843,7 @@ int main(void){
 	NumCreated += OS_AddThread(&Interpreter,128,5);						
 	NumCreated += OS_AddThread(&consumerTaskFifo,128,4);
 	NumCreated += OS_AddThread(&wordDetectedTask,128,3);
-#if AUDIOOUT
-	NumCreated += OS_AddThread(&audioOutThread,128,5);
-#endif
+
 	#if ((!BUFFERINPUT)&&(!EDGETIMERMODE))
 		NumCreated += OS_AddThread(&startSampling,128,2);
 	#endif

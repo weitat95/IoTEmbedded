@@ -514,6 +514,16 @@
               <FileType>1</FileType>
               <FilePath>.\EdgeCount.c</FilePath>
             </File>
+            <File>
+              <FileName>mp3Player.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\mp3Player.c</FilePath>
+            </File>
+            <File>
+              <FileName>mp3Player.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\mp3Player.h</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>

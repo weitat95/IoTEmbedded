@@ -115,6 +115,11 @@ int insert_edge( long  * manchester_word, char edge, int edge_period, int * time
           }
           return new_word ;
 }
+//Used to measure BER
+uint32_t bitError=0;
+static const unsigned long knownFrame[] = {0x02,'1','2','3','4','5','6','7','8','9','0'
+																							 ,'1','2','3','4','5','6','7','8','9','0'
+																						   ,'1','2','3','4','5','6','7','8','9','0','1',0x03}; //1234567890123456789012345678901
 
 int add_byte_to_frame(char * frame_buffer, int * frame_index, int * frame_size, enum receiver_state * frame_state ,unsigned char data){
   if(data == SYNC_SYMBOL/* && (*frame_index) < 0*/){
@@ -130,7 +135,13 @@ int add_byte_to_frame(char * frame_buffer, int * frame_index, int * frame_size, 
   }
   if((*frame_state) != IDLE){ // we are synced
   frame_buffer[*frame_index] = data ;
+	//Measure BER	
+	if(frame_buffer[*frame_index]!=knownFrame[*frame_index]){
+		bitError++;
+	}
+	//End Measure BER	
   (*frame_index) ++ ;
+	
     if(data == STX){
       //Serial.println("START");
 			#ifdef DEBUG
