@@ -56,8 +56,10 @@
 #include "eDisk.h"
 #include "../inc/tm4c123gh6pm.h"
 #include "OS.h"
-#define SDC_CS_PB0 1
-#define SDC_CS_PD7 0
+#include <string.h>
+
+#define SDC_CS_PB0 0
+#define SDC_CS_PD7 1
 #if SDC_CS_PD7
 // CS is PD7  
 // to change CS to another GPIO, change SDC_CS and CS_Init
@@ -198,7 +200,7 @@ static const unsigned char Font[] = {
   0x0C, 0x1E, 0x0C, 0x1E, 0x0C,
   0x30, 0x38, 0x3E, 0x38, 0x30,
   0x06, 0x0E, 0x3E, 0x0E, 0x06,
-  0x00, 0x00, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x00, //0x20
   0x00, 0x00, 0x5F, 0x00, 0x00,
   0x00, 0x07, 0x00, 0x07, 0x00,
   0x14, 0x7F, 0x14, 0x7F, 0x14,
@@ -1218,4 +1220,45 @@ void ST7735_InvertDisplay(int i) {
   } else{
     writecommand(ST7735_INVOFF);
   }
+}
+//RealTime printing on Screen, Maximum 21 characters on a line.
+uint8_t line=0; //max 16 lines
+uint8_t chars=0; //max 21 characters per line [0,20
+char *token;
+
+void ST7735_AcceptText(char * pt){
+	char strings[32];
+	strcpy(strings,pt);
+	if(strings[0]==' '){
+		ST7735_OutString(chars,line," ",ST7735_WHITE);
+		chars++;
+	}
+	token =  strtok(strings," ");
+	while(token!=NULL){
+		uint8_t length= strlen(token);
+		
+		if(length>21){
+			
+		}else{
+			if(chars+length<=21){
+				ST7735_OutString(chars,line,token, ST7735_WHITE);
+				chars+=length;
+			}else{
+				line++;
+				chars=0;
+				if(line>=16){
+					line=0;
+				}
+				ST7735_OutString(0,line,"                     ",ST7735_WHITE);
+				ST7735_OutString(chars,line,token,ST7735_WHITE);
+				chars+=length;
+			}
+		}
+		token = strtok(NULL, " ");
+		if(token!=NULL){
+			ST7735_OutString(chars,line," ",ST7735_WHITE);
+			chars++;
+		}
+	}
+	
 }

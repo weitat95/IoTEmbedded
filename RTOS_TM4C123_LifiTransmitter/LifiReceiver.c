@@ -116,11 +116,15 @@ int insert_edge( long  * manchester_word, char edge, int edge_period, int * time
           return new_word ;
 }
 //Used to measure BER
-uint32_t bitError=0;
+uint32_t byteError=0;
+uint32_t totalByte=0;
 static const unsigned long knownFrame[] = {0x02,'1','2','3','4','5','6','7','8','9','0'
 																							 ,'1','2','3','4','5','6','7','8','9','0'
 																						   ,'1','2','3','4','5','6','7','8','9','0','1',0x03}; //1234567890123456789012345678901
-
+void resetBER(void){
+	byteError=0;
+	totalByte=0;
+}
 int add_byte_to_frame(char * frame_buffer, int * frame_index, int * frame_size, enum receiver_state * frame_state ,unsigned char data){
   if(data == SYNC_SYMBOL/* && (*frame_index) < 0*/){
     (*frame_index) = 0 ;
@@ -136,8 +140,9 @@ int add_byte_to_frame(char * frame_buffer, int * frame_index, int * frame_size, 
   if((*frame_state) != IDLE){ // we are synced
   frame_buffer[*frame_index] = data ;
 	//Measure BER	
+	totalByte++;
 	if(frame_buffer[*frame_index]!=knownFrame[*frame_index]){
-		bitError++;
+		byteError++;
 	}
 	//End Measure BER	
   (*frame_index) ++ ;
@@ -280,6 +285,7 @@ void getDataFrame(void){
     new_word = 0 ;
     if((byte_added = add_byte_to_frame(frameRec_buffer, &frameRec_index, &frameRec_size, &frame_state,received_data)) > 0){
       frameRec_buffer[frameRec_size-1] = '\0';
+			ST7735_AcceptText(&(frameRec_buffer[1]));
       //printf(&(frameRec_buffer[1]));
     }
     //if(frame_state != IDLE) Serial.println(received_data, HEX);

@@ -137,4 +137,6 @@ void ST7735_SetRotation(unsigned char m);
 
 void ST7735_InvertDisplay(int i);
 
+void ST7735_AcceptText(char * pt);
+
 #endif

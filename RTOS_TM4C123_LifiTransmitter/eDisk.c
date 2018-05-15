@@ -54,8 +54,8 @@
 #include "../inc/tm4c123gh6pm.h"
 #include "edisk.h"
 
-#define SDC_CS_PB0 1
-#define SDC_CS_PD7 0
+#define SDC_CS_PB0 0
+#define SDC_CS_PD7 1
 #define TFT_CS                  (*((volatile unsigned long *)0x40004020))
 #define TFT_CS_LOW              0           // CS normally controlled by hardware
 #define TFT_CS_HIGH             0x08
@@ -75,7 +75,8 @@ void CS_Init(void){
   GPIO_PORTD_DIR_R |= 0x80;         // make PD7 output 
   GPIO_PORTD_DR4R_R |= 0x80;        // 4mA output on outputs
   SDC_CS = SDC_CS_HIGH;
-  GPIO_PORTD_PCTL_R &= ~0xF0000000;
+  //GPIO_PORTD_PCTL_R &= ~0xF0000000;
+	GPIO_PORTD_PCTL_R = (GPIO_PORTD_PCTL_R&0x0FFFFFFF)+0x00000000;
   GPIO_PORTD_AMSEL_R &= ~0x80; // disable analog functionality on PD7
   GPIO_PORTD_DEN_R |= 0x80;    // enable digital I/O on PD7
 }
@@ -93,7 +94,8 @@ void CS_Init(void){
   GPIO_PORTB_DIR_R |= 0x01;         // make PB0 output 
   GPIO_PORTB_DR4R_R |= 0x01;        // 4mA output on outputs
   SDC_CS = SDC_CS_HIGH;
-  GPIO_PORTB_PCTL_R &= ~0x0000000F;
+  //GPIO_PORTB_PCTL_R &= ~0x0000000F;
+	GPIO_PORTB_PCTL_R = (GPIO_PORTB_PCTL_R&0xFFFFFFF0)+0x00000000;
   GPIO_PORTB_AMSEL_R &= ~0x01; // disable analog functionality on PB0
   GPIO_PORTB_DEN_R |= 0x01;    // enable digital I/O on PB0
 }

@@ -67,6 +67,7 @@ SSI1Tx (DIN, pin 3) connected to PD3
 To program the emitter for the LIFI please define emitter below
 to program the receiver for the LIFI please define receiver below
 */
+//REMEMBER TO CHANGE SDCS PB0 for TRANSMITTER And PD7 FOR RECEIVER
 //#define EMITTER
 #define RECEIVER
 
@@ -446,10 +447,26 @@ void wordDetectedTask(void){
 //*****************************EMITTER*************************************************
 //*************************************************************************************
 //*************************************************************************************
-
+#if SDCARD
+static FATFS g_sFatFs;
+FIL Handle,Handle2;
+FRESULT fresult;
+FILINFO finfo;
+unsigned char bufferFile[512];
+#endif
+char fileToTransmit[]="text.txt";
 
 #ifdef EMITTER
+void emit_half_bit(void);
 
+void changeFreq(uint32_t freq){
+			OS_StartCritical();
+			OS_DisablePeriodicThread();
+			resetEmitterState();
+			OS_AddPeriodicThread(&emit_half_bit,TIME_1S/freq,3);
+			OS_EndCritical();
+			printf("Transmitting Frequency: %d\n\r",freq);
+}
 int sendData(char* data){
   return write(data,strlen(data));
 }
@@ -457,9 +474,9 @@ char comBuffer[32];
 void sendPeriodicDataTask(void){
   int n=0;
   int counter=-99;
-  while(1){
+  while(n<100){
     while(sendData(comBuffer)!=0){
-			strcpy(comBuffer,"1234567890123456789012345678901");
+			strcpy(comBuffer,"123456789 01226789 #456789");
       OS_Sleep(500);
       counter++;
     }
@@ -471,23 +488,51 @@ void sendPeriodicDataTask(void){
   SPACEFORMATTING
   OS_Kill();
 }
+//Globals for File Systems
+
+void fileReaderTask(void){
+	int fileSize;int i;  UINT n; char letter;
+	//while(1){
+		fresult = f_mount(0, &g_sFatFs);
+		printf("Mounted FS\n\r");
+		if(fresult) diskError("f_mount",0);
+		fresult = f_open(&Handle,fileToTransmit,FA_READ);
+		if(fresult) diskError("f_open",0);
+		fresult= f_stat(fileToTransmit,&finfo);
+		fileSize=finfo.fsize;
+		if(fresult) diskError("f_stat",0);
+		printf("Checked %s stats:%d Bytes\n\r",fileToTransmit,fileSize);
+		i=0;
+		if(fileSize!=0){
+			do{
+				if(fileSize<512){
+					fresult = f_read(&Handle,bufferFile,fileSize,&n);
+					if(fresult) diskError("f_read",0);
+				}else{
+					fresult = f_read(&Handle,bufferFile,512,&n);
+					if(fresult) diskError("f_read",0);
+				}
+				i++;
+				fileSize-=512;
+			}while(fileSize>0);
+			fresult = f_close(&Handle);
+			if(fresult) diskError("f_close",0);	
+			fresult = f_mount(0,0); //Unmount
+			if(fresult) diskError("f_unmount",0);
+		}
+	//} 
+	OS_Kill();
+}
 #endif
 
 //************************************** OTHER THREADS ***************************
 char string[32];
 unsigned long bufferInput[100];
 
-//Globals for File Systems
-#if SDCARD
-static FATFS g_sFatFs;
-FIL Handle,Handle2;
-FRESULT fresult;
-FILINFO finfo;
-unsigned char bufferFile[512];
-#endif
+
 //Global for controlling emitter transmitting frequency;
-uint8_t freqBuffPtr=0;
-static const unsigned long freqBuff[] = {1000,5000,10000,20000,50000};
+uint8_t freqBuffPtr=1;
+static const unsigned long freqBuff[] = {1000,5000,10000,15000,20000,30000,40000,50000,60000,70000,80000,90000,100000};
 //************************************** INTERPRETOR (UART) ***********************
 void Interpreter(void) {
   char str[32];
@@ -758,8 +803,7 @@ void Interpreter(void) {
 		
 		
 //**************************************** TRANSMITTER ************************************
-void emit_half_bit(void);
-
+void changeFreq(uint32_t freq);
 #ifdef EMITTER
     if(strcmp(token,"SEND")==0){
 			SPACEFORMATTING
@@ -785,14 +829,9 @@ void emit_half_bit(void);
     }
 	if(strcmp(token,"CHANGEFREQ")==0){
 			SPACEFORMATTING
-			OS_StartCritical();
-			OS_DisablePeriodicThread();
-			resetEmitterState();
-			OS_AddPeriodicThread(&emit_half_bit,TIME_1S/freqBuff[freqBuffPtr],3);
-			OS_EndCritical();
-			printf("Transmitting Frequency: %d\n\r",freqBuff[freqBuffPtr]);
+			changeFreq(freqBuff[freqBuffPtr]);
 			freqBuffPtr++;
-			if(freqBuffPtr>=5){
+			if(freqBuffPtr>=13){
 				freqBuffPtr=0;
 			}
 			continue;
@@ -806,7 +845,141 @@ void emit_half_bit(void);
 
 
 //*******************************************END Interpretor ****************************
-  
+//***START OF SWITCH FUNCTIONS
+uint8_t sw1_task=0;
+uint8_t sw2_task=0;
+#ifdef EMITTER
+void send50kHzCont100(void){
+	int n=0;
+	sw1_task=1;
+	changeFreq(50000);
+	while(n<10100){
+    while(sendData(comBuffer)!=0){
+			strcpy(comBuffer," 123456789 012345$!9 0##23456789");
+      OS_Sleep(500);
+    }
+    printf("Data Sent:%u",n);
+    SPACEFORMATTING
+    n++;
+  }
+  printf("Data Sending Task Done (sent:%u)",n);
+  SPACEFORMATTING
+	sw1_task=0;
+	OS_Kill();
+}
+Sema4Type doneSendFile;
+
+void sendReadFile(void){
+	uint32_t m=0;
+	unsigned char * ptr=bufferFile;
+	changeFreq(50000);
+	//while(n<10100){	
+	while(strncpy(comBuffer,ptr+m*31,31)!=NULL){
+			if(comBuffer[0]==0 || m*31>512){
+				break;
+			}
+			comBuffer[31]='\0';
+			sendData(comBuffer);
+			OS_Sleep(500);
+			m++;
+	}
+  printf("Data Sending Task Done (sent:%u)",m);
+  SPACEFORMATTING
+	OS_Signal(&doneSendFile);
+	OS_Kill();
+}
+void readFileTask(void){
+		sw2_task=1;
+		OS_InitSemaphore(&doneSendFile,0);
+			char fileName[]="file5.txt";
+			//char file2Name[]="copy.mp3";
+			int i;  UINT n; char letter; int fileSize;
+			fresult = f_mount(0, &g_sFatFs);
+			printf("Mounted FS\n\r");
+			//if(fresult) diskError("f_mount",0);
+			fresult = f_open(&Handle2,fileName,FA_READ);
+			//if(fresult) diskError("f_open",0);
+			printf("Opened %s\n\r",fileName);
+			fresult = f_stat(fileName,&finfo);
+			fileSize=finfo.fsize;
+			//if(fresult) diskError("f_stat",0);
+			printf("Checked %s stats:%d Bytes\n\r",fileName,fileSize);
+			//fresult = f_open(&Handle,file2Name,FA_CREATE_ALWAYS|FA_WRITE);
+			//if(fresult) diskError("f_open",0);
+			//printf("Opened (Created) %s\n\r",file2Name);
+			i=0;
+			
+			do{
+				if(fileSize<512){
+					fresult = f_read(&Handle2,bufferFile,fileSize,&n);
+					if(fresult) diskError("f_read",0);
+					//fresult = f_write(&Handle,bufferFile,fileSize,&n);
+					//if(fresult) diskError("f_write",0);
+				}else{
+					fresult = f_read(&Handle2,bufferFile,512,&n);
+					if(fresult) diskError("f_read",0);
+					//fresult = f_write(&Handle,bufferFile,31,&n);
+					//if(fresult) diskError("f_write",0);
+				}
+				NumCreated += OS_AddThread(&sendReadFile,128,1);
+				OS_Wait(&doneSendFile);
+				i++;
+				fileSize-=512;
+					
+			}while(fileSize>0);
+			 
+			//fresult = f_close(&Handle);
+			//if(fresult) diskError("f_close",0);
+			fresult = f_close(&Handle2);
+			if(fresult) diskError("f_close",0);
+			UART_OutString("File Closed\n\r");
+
+			//fresult = f_stat(file2Name,&finfo);
+			//fileSize=finfo.fsize;
+			//if(fresult) diskError("f_stat",0);
+			//printf("Checked %s stats:%d Bytes\n\r",file2Name,fileSize);
+			fresult = f_mount(0,0); //Unmount
+			if(fresult) diskError("f_unmount",0);
+			UART_OutString("Unmount Fs\n\r");
+			//UART_OutString("Done FILEREADTOWRITE\n\r");
+	sw2_task=0;
+	OS_Kill();			
+}
+
+#endif
+
+void SW1_Task(void){
+  if(sw1_task==1) return;
+#ifdef EMITTER
+	NumCreated += OS_AddThread(&send50kHzCont100,128,1);
+#endif
+#ifdef RECEIVER
+	resetBER();
+	//ST7735_InitR(INITR_REDTAB);
+	//EdgeTimer_Init(&edgeTask);
+	EdgeTimer1A_Init(&edgeTask);
+#endif
+}
+int condflag=-1;
+void SW2_Task(void){
+	if(sw2_task==1) return;
+#ifdef RECEIVER
+	
+	if(condflag==1){
+		ST7735_AcceptText("TEST 5a G");
+		//ST7735_OutString(0,0, "TEST56789012345678901", ST7735_WHITE);
+		condflag=0;
+	}else{
+		ST7735_AcceptText(" 99");
+		//ST7735_OutString(0,0, "ASTA", ST7735_WHITE);
+		condflag=1;
+	}
+#endif
+#ifdef EMITTER
+	NumCreated += OS_AddThread(&readFileTask,128,1);
+#endif
+  //NumCreated += OS_AddThread(&WifiTask,128,5);
+}
 //******************************************* MAIN FUNCTION ******************************
 
  int main(void){
@@ -820,21 +993,24 @@ void emit_half_bit(void);
   Idlecount  = 0;
   count1=0;
   NumCreated = 0;
+	OS_AddSW1Task(&SW1_Task,1);
+	OS_AddSW2Task(&SW2_Task,1);
 #if SDCARD
 	OS_AddPeriodicThread2(&disk_timerproc,10*TIME_1MS,0);   // time out routines for disk
 #endif
 #ifdef EMITTER
   OS_AddPeriodicThread(&emit_half_bit,TIME_1S/SYMBOLRATE,3);
 	NumCreated += OS_AddThread(&Interpreter,128,4);
-	
+	ST7735_InitR(INITR_REDTAB);
+
 #endif
 	
 	
 
 #ifdef RECEIVER
 	OS_Fifo_Init(2048);
-	//ST7735_InitR(INITR_REDTAB);
-
+	ST7735_InitR(INITR_REDTAB);
+	
 #if EDGETIMERMODE
 	oversampling=1;
 #endif
@@ -849,7 +1025,7 @@ void emit_half_bit(void);
 	#endif
 
 	#if EDGETIMERMODE
-		EdgeTimer_Init(&edgeTask);
+		//EdgeTimer_Init(&edgeTask);
 		#if EDGETIMERDEBUG	
 			//Activate Port D for simulating squarewaves to test edge capture to PB6
 			SYSCTL_RCGCGPIO_R |= 0x08; // activate Port D
@@ -866,7 +1042,6 @@ void emit_half_bit(void);
 #endif
 
   NumCreated += OS_AddThread(&IdleTask,128,6);  // runs when nothing useful to do
-
   OS_Launch(TIME_SLICE); // doesn't return, interrupts enabled in here
 
   return -1;             // this never executes

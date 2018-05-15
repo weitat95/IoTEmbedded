@@ -227,6 +227,7 @@ int OS_AddPeriodicThread(void(*task)(void),
 void OS_DisablePeriodicThread(void){
   TIMER4_CTL_R = 0x00000000;    // 1) disable TIMER4A during setup
 }
+//USE TIMER 5
 int OS_AddPeriodicThread2(void(*task)(void), uint32_t period,uint32_t priority){
   //else if (one==1) {
 	  counter2_os=0;
@@ -245,7 +246,7 @@ int OS_AddPeriodicThread2(void(*task)(void), uint32_t period,uint32_t priority){
   // interrupts enabled in the main program after all devices initialized
   // vector number 92
     NVIC_EN2_R = 1<<28;           // 9) enable IRQ 70-64 in NVIC
-    TIMER5_CTL_R = 0x00000001;    // 10) enable TIMER4A
+    TIMER5_CTL_R = 0x00000001;    // 10) enable TIMER5A
     //one++;
     //return 1;
   
@@ -905,13 +906,13 @@ unsigned long OS_Id(void){
 
 void wTimer5(void){
   SYSCTL_RCGCWTIMER_R |= 0x20;   // 0) activate TIMER5
-  WTIMER5_CTL_R = 0x00000000;    // 1) disable TIMER1A during setup
+  WTIMER5_CTL_R = 0x00000000;    // 1) disable TIMER5 during setup
   WTIMER5_CFG_R = 0x00000000;    // 2) configure for 32-bit mode
   WTIMER5_TAMR_R = 0x00000002;   // 3) configure for periodic mode, default down-count settings
   WTIMER5_TAILR_R = 0xFFFFFFFF;    // 4) reload value
   WTIMER5_TBILR_R = 0xFFFFFFFF;    // 4) reload value
   WTIMER5_TAPR_R = 0;            // 5) bus clock resolution
-  WTIMER5_CTL_R = 0x00000001;    // 10) enable TIMER4A
+  WTIMER5_CTL_R = 0x00000001;    // 10) enable TIMER5
 }
 
 void Jitter(void){
@@ -948,7 +949,7 @@ void InitTimer3A(uint32_t period)
                                    // 3) configure for periodic mode, default down-count settings
   TIMER3_TAMR_R = TIMER_TAMR_TAMR_PERIOD;
   TIMER3_TAILR_R = period - 1;     // 4) reload value
-                                   // 5) clear timer1A timeout flag
+                                   // 5) clear timer3A timeout flag
   TIMER3_ICR_R = TIMER_ICR_TATOCINT;
   TIMER3_IMR_R |= TIMER_IMR_TATOIM;// 6) arm timeout interrupt
 								   // 7) priority shifted to bits 31-29 for timer2A

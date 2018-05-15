@@ -136,4 +136,50 @@ void Timer0A_Handler(void){
 	TIMER0_TAPR_R=0xFF;
   (*EdgeTask)(edge,timer);                // execute user task
 }
+//PB4 As the trigger signal
+void EdgeTimer1A_Init(void(*task)(int,unsigned long)){
+  SYSCTL_RCGCTIMER_R |= 0x02;  // activate Timer 1
+  SYSCTL_RCGCGPIO_R |= 0x02;   // activate Port B
+                               // allow time to finish activating
+  while((SYSCTL_PRGPIO_R&0x0002) == 0){};
+		
+  GPIO_PORTB_DIR_R &= ~0x10;   // make PB4 in
+  GPIO_PORTB_AFSEL_R |= 0x10;  // enable alt funct on PB4
+  GPIO_PORTB_DEN_R |= 0x10;    // enable digital I/O on PB4
+                               // configure P4 as T0CCP0
+  GPIO_PORTB_PCTL_R = (GPIO_PORTB_PCTL_R&0xFFF0FFFF)+0x00070000;
+  GPIO_PORTB_AMSEL_R &= ~0x10; // disable analog functionality on PB4
+		
+	TIMER1_CTL_R &= ~0x00000001; // disable timer1A during setup
+  TIMER1_CFG_R = 0x00000004;   // configure for 16-bit edge timer mode
+	TIMER1_TAMR_R = 0x007;				//Count Down from 0xffffff
+	TIMER1_CTL_R |= 0xC;      // configure for both rising and falling edge
+	TIMER1_TAPR_R = 0xFF;				//prescale of 256. maximum value=209.7152ms
+	TIMER1_IMR_R = 0x00000004;    // 7) arm timeout interrupt for event trigger 
+	TIMER1_TAILR_R = 0xFFFF;
+	
+	NVIC_PRI5_R = (NVIC_PRI5_R&0xFFF00FF)|0x00000000; // 8) priority 0
+	NVIC_EN0_R = 1<<21;           // 9) enable IRQ 21 in NVIC
+	EdgeTask=task;
+	
+	TIMER1_ICR_R = 0x00000004;// acknowledge timer1A timeout
+	TIMER1_CTL_R |= 0x00000001;  // enable timer1A 16-b, positive edge-count, up-count
+		
+}
 
+void Timer1A_Handler(void){
+	TIMER1_ICR_R = 0x00000004;// acknowledge timer0A event timeout
+	edge_counter++;
+	if(GPIO_PORTB_DATA_R == 0x10){
+		risingedge++;
+		edge=1;
+	}else if(GPIO_PORTB_DATA_R == 0x00){
+		fallingedge++;
+		edge=-1;
+	}
+	timer=0xFFFFFF-TIMER1_TAR_R;
+	TIMER1_TAV_R=0xFFFFFF;
+	TIMER1_TAILR_R=0xFFFF;
+	TIMER1_TAPR_R=0xFF;
+  (*EdgeTask)(edge,timer);                // execute user task
+}
