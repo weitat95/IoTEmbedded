@@ -67,7 +67,7 @@ SSI1Tx (DIN, pin 3) connected to PD3
 To program the emitter for the LIFI please define emitter below
 to program the receiver for the LIFI please define receiver below
 */
-//REMEMBER TO CHANGE SDCS PB0 for TRANSMITTER And PD7 FOR RECEIVER
+//REMEMBER TO CHANGE (ST7735.c)SDCS PB0 for TRANSMITTER And PD7 FOR RECEIVER
 //#define EMITTER
 #define RECEIVER
 
@@ -868,7 +868,7 @@ void send50kHzCont100(void){
 	OS_Kill();
 }
 Sema4Type doneSendFile;
-
+uint32_t sleepTime=500;
 void sendReadFile(void){
 	uint32_t m=0;
 	unsigned char * ptr=bufferFile;
@@ -880,7 +880,7 @@ void sendReadFile(void){
 			}
 			comBuffer[31]='\0';
 			sendData(comBuffer);
-			OS_Sleep(500);
+			OS_Sleep(sleepTime);
 			m++;
 	}
   printf("Data Sending Task Done (sent:%u)",m);
@@ -947,38 +947,33 @@ void readFileTask(void){
 }
 
 #endif
-
+//Left Switch Task
 void SW1_Task(void){
   if(sw1_task==1) return;
 #ifdef EMITTER
-	NumCreated += OS_AddThread(&send50kHzCont100,128,1);
+	sleepTime=250;
+	NumCreated += OS_AddThread(&readFileTask,128,1);
 #endif
 #ifdef RECEIVER
 	resetBER();
-	//ST7735_InitR(INITR_REDTAB);
 	//EdgeTimer_Init(&edgeTask);
 	EdgeTimer1A_Init(&edgeTask);
 #endif
 }
+
 int condflag=-1;
+//Right Switch Task
 void SW2_Task(void){
 	if(sw2_task==1) return;
 #ifdef RECEIVER
-	
-	if(condflag==1){
-		ST7735_AcceptText("TEST 5a G");
-		//ST7735_OutString(0,0, "TEST56789012345678901", ST7735_WHITE);
-		condflag=0;
-	}else{
-		ST7735_AcceptText(" 99");
-		//ST7735_OutString(0,0, "ASTA", ST7735_WHITE);
-		condflag=1;
-	}
-#endif
+	//Clear Screen
+	ST7735_ClearResetText();
+	#endif
 #ifdef EMITTER
+	sleepTime=0;
+
 	NumCreated += OS_AddThread(&readFileTask,128,1);
 #endif
-  //NumCreated += OS_AddThread(&WifiTask,128,5);
 }
 //******************************************* MAIN FUNCTION ******************************
 

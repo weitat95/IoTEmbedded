@@ -139,4 +139,6 @@ void ST7735_InvertDisplay(int i);
 
 void ST7735_AcceptText(char * pt);
 
+void ST7735_ClearResetText(void);
+
 #endif
